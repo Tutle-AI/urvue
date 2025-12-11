@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  STARTER
+  PRO
+}
+
+enum SessionStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum MessageRole {
+  CUSTOMER
+  ASSISTANT
+  SYSTEM
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}
+
+model User {
+  id         String     @id @default(cuid())
+  clerkId    String     @unique
+  email      String
+  businesses Business[]
+  createdAt  DateTime   @default(now())
+}
+
+model Business {
+  id                    String             @id @default(cuid())
+  name                  String
+  slug                  String             @unique
+  owner                 User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId               String
+  locations             Location[]
+  stripeCustomerId      String?            @unique
+  stripeSubscriptionId  String?            @unique
+  plan                  Plan               @default(STARTER)
+  trialEndsAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+}
+
+model Location {
+  id         String            @id @default(cuid())
+  business   Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  name       String
+  slug       String            @unique
+  sessions   FeedbackSession[]
+  createdAt  DateTime          @default(now())
+}
+
+model FeedbackSession {
+  id         String            @id @default(cuid())
+  location   Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId String
+  customerName String?
+  status     SessionStatus     @default(ACTIVE)
+  messages   FeedbackMessage[]
+  summary    FeedbackSummary?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model FeedbackMessage {
+  id        String           @id @default(cuid())
+  session   FeedbackSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  role      MessageRole
+  content   String
+  createdAt DateTime         @default(now())
+}
+
+model FeedbackSummary {
+  id        String           @id @default(cuid())
+  session   FeedbackSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String           @unique
+  summary   String
+  sentiment Sentiment        @default(NEUTRAL)
+  score     Float?
+  createdAt DateTime         @default(now())
+}
+
