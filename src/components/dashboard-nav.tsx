@@ -21,7 +21,7 @@ export function DashboardNav() {
           </Link>
           <nav className="flex gap-4 text-sm text-muted">
             {links.map((link) => {
-              const active =
+              const active = 
                 link.href === "/dashboard"
                   ? pathname === "/dashboard"
                   : pathname.startsWith(link.href);

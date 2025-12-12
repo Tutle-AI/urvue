@@ -31,7 +31,7 @@ export async function generateSessionSummary(sessionId: string) {
         content: `Summarize this customer conversation into 3-5 bullet points and infer sentiment (positive, neutral, or negative) with a 0-1 confidence score.\nReturn JSON with keys: summary, sentiment, score.\n\n${transcript}`,
       },
     ],
-    response_format: { type: "json_object" },
+    text: { format: { type: "json_object" } },
   });
 
   const payload = JSON.parse(response.output_text ?? "{}") as {

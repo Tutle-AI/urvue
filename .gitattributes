@@ -1,0 +1,30 @@
+# Enforce consistent line endings across OS
+# - Store text files as LF in git
+# - Prevent noisy diffs when switching between Windows/macOS
+
+* text=auto eol=lf
+
+# Common binary formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Archives
+*.zip binary
+*.gz binary
+*.tgz binary
+*.7z binary
+
+# Lockfiles are text, keep LF
+pnpm-lock.yaml text eol=lf
+
