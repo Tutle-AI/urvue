@@ -6,7 +6,7 @@ export function SiteFooter() {
       <div className="grid gap-12 md:grid-cols-[1.2fr_2fr]">
         {/* Left - Branding */}
         <div>
-          <h3 className="font-serif text-4xl font-normal">URVUE</h3>
+          <h3 className="font-serif text-4xl font-normal">UrVue</h3>
           <p className="mt-4 max-w-xs text-sm text-light-muted">
             Beautifully designed, privacy-focused, and packed with features. We
             care about your experience not your data.

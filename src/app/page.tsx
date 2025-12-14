@@ -1,9 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
+import { currentUser } from "@clerk/nextjs/server";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { HomeClients, HomeFeatures } from "@/components/home-features";
 import { env } from "@/lib/env";
+import { redirect } from "next/navigation";
 
 const featureList = [
   {
@@ -51,7 +53,12 @@ const clientTypes = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const user = await currentUser();
+  if (user) {
+    redirect("/dashboard");
+  }
+
   const feedbackSlug = "urvue";
   const feedbackPath = `/feedback/${feedbackSlug}`;
   const feedbackUrl = `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${feedbackPath}`;
@@ -288,12 +295,18 @@ export default function Home() {
       </section>
 
       {/* Clients Section - Dark */}
-      <section className="bg-background px-6 pb-24 pt-44 md:pt-56 lg:pt-64">
+      <section
+        id="clients"
+        className="bg-background px-6 pb-24 pt-44 md:pt-56 lg:pt-64"
+      >
         <HomeClients clients={clientTypes} />
       </section>
 
       {/* Give us your feedback - Light */}
-      <section className="bg-light px-6 pb-20 pt-44 text-background md:pb-24 md:pt-56 lg:pt-64">
+      <section
+        id="feedback"
+        className="bg-light px-6 pb-20 pt-44 text-background md:pb-24 md:pt-56 lg:pt-64"
+      >
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-start">
             <div>
