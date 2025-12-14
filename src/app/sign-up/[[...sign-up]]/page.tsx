@@ -1,14 +1,26 @@
-"use client";
-
 import { SignUp } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { AuthSplitLayout } from "@/components/auth-split-layout";
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  const user = await currentUser();
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="glass rounded-2xl p-6">
-        <SignUp />
-      </div>
-    </div>
+    <AuthSplitLayout
+      variant="sign-up"
+      title={
+        <>
+          Join UrVue
+        </>
+      }
+      description="Start collecting clear, privacy-friendly feedback through real conversations—then summarize it into insights your team can act on."
+    >
+      <SignUp />
+    </AuthSplitLayout>
   );
 }
 
