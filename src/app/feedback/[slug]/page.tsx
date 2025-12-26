@@ -18,12 +18,14 @@ export default async function FeedbackPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-background px-4 py-12 text-foreground">
+      <div className="mx-auto flex max-w-5xl items-center justify-center">
       <FeedbackChat
         slug={slug}
         businessName={location.business.name}
         locationName={location.name}
       />
+      </div>
     </div>
   );
 }

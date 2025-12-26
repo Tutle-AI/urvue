@@ -41,6 +41,12 @@ model Business {
   id                    String             @id @default(cuid())
   name                  String
   slug                  String             @unique
+  businessType          String?
+  description           String?
+  focusTopic1           String?
+  focusTopic2           String?
+  focusTopic3           String?
+  onboardingCompletedAt DateTime?
   owner                 User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId               String
   locations             Location[]

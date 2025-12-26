@@ -1,248 +1,274 @@
 import Link from "next/link";
-import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db";
-import { requireDbUser } from "@/lib/auth";
-import { slugify } from "@/lib/slug";
-import { BillingButtons } from "@/components/billing-buttons";
+import { formatDistanceToNow } from "date-fns";
+import { requireOnboardedBusiness } from "@/lib/business";
+import {
+  getBusinessStats,
+  getSentimentTrend,
+  getLocationStats,
+  getRecentSessions,
+} from "@/lib/stats";
+import { SentimentChart } from "./sentiment-chart";
+import { TrendChart } from "./trend-chart";
 
-async function uniqueBusinessSlug(base: string) {
-  let slug = base || "business";
-  let suffix = 1;
-  let exists = await prisma.business.findUnique({ where: { slug } });
-
-  while (exists) {
-    slug = `${base}-${suffix++}`;
-    exists = await prisma.business.findUnique({ where: { slug } });
-  }
-
-  return slug;
-}
-
-async function uniqueLocationSlug(base: string) {
-  let slug = base || "location";
-  let suffix = 1;
-  let exists = await prisma.location.findUnique({ where: { slug } });
-
-  while (exists) {
-    slug = `${base}-${suffix++}`;
-    exists = await prisma.location.findUnique({ where: { slug } });
-  }
-
-  return slug;
-}
-
-async function createBusiness(formData: FormData) {
-  "use server";
-  const name = formData.get("name")?.toString().trim();
-  if (!name) return;
-
-  const { dbUser } = await requireDbUser();
-  const slug = await uniqueBusinessSlug(slugify(name));
-
-  const business = await prisma.business.create({
-    data: {
-      name,
-      slug,
-      ownerId: dbUser.id,
-      plan: "STARTER",
-    },
-  });
-
-  const locationSlug = await uniqueLocationSlug(`${slug}-main`);
-  await prisma.location.create({
-    data: {
-      name: "Main location",
-      slug: locationSlug,
-      businessId: business.id,
-    },
-  });
-
-  revalidatePath("/dashboard");
-}
-
-async function createLocation(formData: FormData) {
-  "use server";
-  const businessId = formData.get("businessId")?.toString();
-  const name = formData.get("locationName")?.toString().trim();
-  if (!businessId || !name) return;
-
-  const slugBase = slugify(name);
-  const slug = await uniqueLocationSlug(slugBase);
-
-  await prisma.location.create({
-    data: {
-      name,
-      slug,
-      businessId,
-    },
-  });
-
-  revalidatePath("/dashboard");
-}
-
-export default async function DashboardPage() {
-  const { dbUser } = await requireDbUser();
-
-  const business = await prisma.business.findFirst({
-    where: { ownerId: dbUser.id },
-    include: {
-      locations: true,
-    },
-  });
-
-  if (!business) {
-    return (
-      <div className="mx-auto max-w-xl rounded-3xl border border-border bg-card p-8">
-        <h1 className="text-2xl font-semibold text-foreground">Create your business</h1>
-        <p className="mt-2 text-sm text-muted">
-          We&apos;ll create your workspace and a default location so you can start
-          collecting feedback right away.
-        </p>
-        <form action={createBusiness} className="mt-6 flex flex-col gap-3">
-          <label className="text-sm text-muted">Business name</label>
-          <input
-            name="name"
-            placeholder="e.g., Northside Coffee"
-            className="rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
-            required
-          />
-          <button
-            type="submit"
-            className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-white transition hover:brightness-110"
-          >
-            Continue
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  const sessions = await prisma.feedbackSession.findMany({
-    where: { location: { businessId: business.id } },
-    include: { location: true, summary: true },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-  });
-
-  const totalSessions = sessions.length;
-  const summarized = sessions.filter((s) => s.summary).length;
-  const positive =
-    sessions.filter((s) => s.summary?.sentiment === "POSITIVE").length || 0;
-
+function MetricCard({
+  label,
+  value,
+  subtext,
+  trend,
+}: {
+  label: string;
+  value: string | number;
+  subtext?: string;
+  trend?: { value: number; positive: boolean };
+}) {
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-muted">Welcome back</p>
-          <h1 className="text-3xl font-semibold text-foreground">
-            {business.name}
-          </h1>
-          <p className="text-sm text-muted">Plan: {business.plan}</p>
-        </div>
-        <BillingButtons plan={business.plan} />
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted">
+        {label}
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted">Sessions</p>
-          <p className="text-2xl font-semibold text-foreground">{totalSessions}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted">Summarized</p>
-          <p className="text-2xl font-semibold text-foreground">{summarized}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm text-muted">Positive</p>
-          <p className="text-2xl font-semibold text-foreground">
-            {positive}/{summarized || 1}
-          </p>
-        </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className="text-3xl font-semibold text-foreground">{value}</span>
+        {trend && (
+          <span
+            className={`text-sm font-medium ${
+              trend.positive ? "text-green-500" : "text-red-400"
+            }`}
+          >
+            {trend.positive ? "+" : ""}
+            {trend.value}%
+          </span>
+        )}
       </div>
-
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Locations</h2>
-            <p className="text-sm text-muted">
-              Share the QR link with customers to start capturing feedback.
-            </p>
-          </div>
-          <form action={createLocation} className="flex flex-col gap-2 sm:flex-row">
-            <input type="hidden" name="businessId" value={business.id} />
-            <input
-              name="locationName"
-              placeholder="Add a new location"
-              className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
-            />
-            <button
-              type="submit"
-              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
-            >
-              Add
-            </button>
-          </form>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {business.locations.map((loc) => (
-            <div
-              key={loc.id}
-              className="flex flex-col gap-2 rounded-2xl border border-border bg-surface/60 p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-foreground">{loc.name}</p>
-                  <p className="text-xs text-muted">Slug: {loc.slug}</p>
-                </div>
-                <Link
-                  className="text-sm font-medium text-primary underline"
-                  href={`/feedback/${loc.slug}`}
-                  target="_blank"
-                >
-                  Open link
-                </Link>
-              </div>
-              <div className="text-xs text-muted">
-                QR link: /feedback/{loc.slug}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">Recent sessions</h2>
-          <p className="text-xs text-muted">Last 20 conversations</p>
-        </div>
-        <div className="grid gap-3">
-          {sessions.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted">
-              No sessions yet. Share your location link to start capturing feedback.
-            </div>
-          )}
-          {sessions.map((session) => (
-            <Link
-              key={session.id}
-              href={`/dashboard/sessions/${session.id}`}
-              className="flex flex-col gap-2 rounded-2xl border border-border bg-surface/60 p-4 transition hover:border-primary"
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-foreground">
-                  {session.customerName || "Guest"} • {session.location.name}
-                </div>
-                <div className="text-xs uppercase tracking-wide text-muted">
-                  {session.summary?.sentiment || "PENDING"}
-                </div>
-              </div>
-              <div className="text-xs text-muted">
-                {session.summary?.summary?.slice(0, 120) ||
-                  "Awaiting summary. Click to view transcript."}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
+      {subtext && <div className="mt-1 text-xs text-muted">{subtext}</div>}
     </div>
   );
 }
 
+function sentimentColor(sentiment: string | null | undefined) {
+  const s = (sentiment || "").toUpperCase();
+  if (s === "POSITIVE") return "bg-green-500/20 text-green-400";
+  if (s === "NEGATIVE") return "bg-red-500/20 text-red-400";
+  if (s === "NEUTRAL") return "bg-yellow-500/20 text-yellow-400";
+  return "bg-foreground/10 text-muted";
+}
+
+function sentimentLabel(sentiment: string | null | undefined) {
+  return sentiment || "PENDING";
+}
+
+export default async function DashboardPage() {
+  const { business } = await requireOnboardedBusiness();
+
+  const [stats, trend, locationStats, recentSessions] = await Promise.all([
+    getBusinessStats(business.id),
+    getSentimentTrend(business.id, 30),
+    getLocationStats(business.id),
+    getRecentSessions(business.id, 5),
+  ]);
+
+  const positivePercent =
+    stats.summarizedSessions > 0
+      ? Math.round((stats.sentimentBreakdown.positive / stats.summarizedSessions) * 100)
+      : 0;
+
+  const weekOverWeekChange =
+    stats.lastWeekSessions > 0
+      ? Math.round(
+          ((stats.thisWeekSessions - stats.lastWeekSessions) / stats.lastWeekSessions) * 100
+        )
+      : stats.thisWeekSessions > 0
+      ? 100
+      : 0;
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+          {business.name}
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          Your feedback insights at a glance
+        </p>
+      </div>
+
+      {/* Metric cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="Total Sessions"
+          value={stats.totalSessions}
+          subtext={`${stats.activeSessions} active`}
+        />
+        <MetricCard
+          label="This Week"
+          value={stats.thisWeekSessions}
+          trend={
+            weekOverWeekChange !== 0
+              ? { value: Math.abs(weekOverWeekChange), positive: weekOverWeekChange > 0 }
+              : undefined
+          }
+          subtext="vs last week"
+        />
+        <MetricCard
+          label="Positive Feedback"
+          value={`${positivePercent}%`}
+          subtext={`${stats.sentimentBreakdown.positive} of ${stats.summarizedSessions} summarized`}
+        />
+        <MetricCard
+          label="Avg Confidence"
+          value={stats.avgScore !== null ? `${Math.round(stats.avgScore * 100)}%` : "—"}
+          subtext="AI sentiment confidence"
+        />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Sentiment breakdown */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="text-sm font-medium text-foreground">Sentiment Breakdown</h2>
+          <p className="mt-1 text-xs text-muted">
+            Distribution of customer feedback
+          </p>
+          <div className="mt-4">
+            <SentimentChart
+              data={[
+                { name: "Positive", value: stats.sentimentBreakdown.positive },
+                { name: "Neutral", value: stats.sentimentBreakdown.neutral },
+                { name: "Negative", value: stats.sentimentBreakdown.negative },
+                { name: "Pending", value: stats.sentimentBreakdown.pending },
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Trend chart */}
+        <div className="rounded-2xl border border-border bg-card p-5 lg:col-span-2">
+          <h2 className="text-sm font-medium text-foreground">Feedback Trend</h2>
+          <p className="mt-1 text-xs text-muted">Last 30 days by sentiment</p>
+          <div className="mt-4">
+            <TrendChart data={trend} />
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row: Recent sessions + Top locations */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent sessions */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-foreground">Recent Sessions</h2>
+              <p className="mt-1 text-xs text-muted">Latest customer feedback</p>
+            </div>
+            <Link
+              href="/dashboard/sessions"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {recentSessions.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">
+                No sessions yet. Share your feedback link to get started.
+              </div>
+            ) : (
+              recentSessions.map((session) => (
+                <Link
+                  key={session.id}
+                  href={`/dashboard/sessions/${session.id}`}
+                  className="flex items-center justify-between rounded-xl bg-surface/60 px-4 py-3 transition hover:bg-surface"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {session.customerName || "Guest"}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted">
+                      {session.location.name} •{" "}
+                      {formatDistanceToNow(session.createdAt, { addSuffix: true })}
+                    </div>
+                  </div>
+                  <span
+                    className={`ml-3 shrink-0 rounded-full px-2.5 py-1 text-xs font-medium uppercase ${sentimentColor(
+                      session.summary?.sentiment
+                    )}`}
+                  >
+                    {sentimentLabel(session.summary?.sentiment)}
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Top locations */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-foreground">Locations</h2>
+              <p className="mt-1 text-xs text-muted">Sessions by location</p>
+            </div>
+            <Link
+              href="/dashboard/locations"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Manage
+            </Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {locationStats.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted">
+                No locations yet. Add one to start collecting feedback.
+              </div>
+            ) : (
+              locationStats.map((loc) => (
+                <div
+                  key={loc.id}
+                  className="flex items-center justify-between rounded-xl bg-surface/60 px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {loc.name}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted">
+                      {loc.lastActivity
+                        ? `Last activity ${formatDistanceToNow(loc.lastActivity, {
+                            addSuffix: true,
+                          })}`
+                        : "No activity yet"}
+                    </div>
+                  </div>
+                  <div className="ml-3 shrink-0 rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary">
+                    {loc.sessionCount} session{loc.sessionCount !== 1 ? "s" : ""}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick action */}
+      {stats.totalSessions === 0 && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Ready to collect feedback?
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Share your feedback link with customers to start gathering insights.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/locations"
+              className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
+            >
+              Get your link
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -23,12 +23,10 @@ export function FeedbackChat({
   locationName: string;
 }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: `Thanks for visiting ${businessName}! I'm here to capture your experience at ${locationName}. What stood out for you?`,
-    },
-  ]);
+  const [started, setStarted] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -38,24 +36,35 @@ export function FeedbackChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, summary]);
 
-  useEffect(() => {
-    const startSession = async () => {
+  const startConversation = async () => {
+    setLoading(true);
+    try {
       const res = await fetch("/api/feedback/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({
+          slug,
+          customerName: customerName.trim() || null,
+        }),
       });
 
       if (!res.ok) return;
       const data = await res.json();
       setSessionId(data.sessionId);
-    };
-
-    startSession();
-  }, [slug]);
+      setStarted(true);
+      setMessages([
+        {
+          role: "assistant",
+          content: `${customerName.trim() ? `Nice to meet you, ${customerName.trim()}. ` : ""}Thanks for visiting ${businessName}! What stood out for you at ${locationName}?`,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const sendMessage = async () => {
-    if (!sessionId || !input.trim()) return;
+    if (!sessionId || !input.trim() || ended) return;
     const content = input.trim();
     setInput("");
     setMessages((prev) => [...prev, { role: "customer", content }]);
@@ -71,6 +80,14 @@ export function FeedbackChat({
       const data = await res.json();
       if (data.reply) {
         setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      }
+      if (data.summary) {
+        setSummary({
+          summary: data.summary.summary,
+          sentiment: data.summary.sentiment,
+          score: data.summary.score,
+        });
+        setEnded(true);
       }
     } catch {
       setMessages((prev) => [
@@ -101,6 +118,7 @@ export function FeedbackChat({
           sentiment: data.summary.sentiment,
           score: data.summary.score,
         });
+        setEnded(true);
       }
     } catch {
       // ignore
@@ -110,22 +128,56 @@ export function FeedbackChat({
   };
 
   return (
-    <div className="glass flex w-full max-w-3xl flex-col gap-4 rounded-3xl p-4 md:p-6">
-      <div className="flex items-center justify-between">
+    <div className="flex w-full max-w-3xl flex-col gap-4 rounded-3xl border border-border bg-card p-4 md:p-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-muted">You are chatting with</p>
+          <p className="text-xs uppercase tracking-wide text-muted">URVUE</p>
           <p className="text-lg font-semibold text-foreground">{businessName}</p>
+          <p className="text-sm text-muted">{locationName}</p>
         </div>
         <button
           onClick={finishConversation}
           className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary hover:text-primary disabled:opacity-50"
-          disabled={loading || !sessionId}
+          disabled={loading || !sessionId || ended}
         >
           Finish & summarize
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl bg-surface/70 p-4">
+      {!started ? (
+        <div className="rounded-2xl border border-border bg-surface/60 p-5">
+          <h2 className="text-lg font-semibold text-foreground">
+            Tell us about your experience
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            This will take about a minute. You can skip your name if you want.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <label className="text-sm text-muted">Your name (optional)</label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="e.g., Sam"
+                className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={startConversation}
+              disabled={loading}
+              className="h-[46px] rounded-full bg-primary px-5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
+            >
+              Start
+            </button>
+          </div>
+          <div className="mt-4 text-xs text-muted">
+            Responses are generated by AI to keep things quick.
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 rounded-2xl bg-surface/60 p-4">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -154,21 +206,24 @@ export function FeedbackChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Tell us how your visit went..."
-          className="min-h-[90px] resize-none rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
+              className="min-h-[90px] resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
         />
         <div className="flex items-center gap-3">
           <button
+                type="button"
             onClick={sendMessage}
-            disabled={loading || !input.trim() || !sessionId}
+                disabled={loading || !input.trim() || !sessionId || ended}
             className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
           >
             Send
           </button>
           <span className="text-xs text-muted">
-            Responses are generated by AI to keep things quick.
+                Quick, conversational feedback. No forms.
           </span>
         </div>
       </div>
+        </>
+      )}
 
       {summary && (
         <div className="rounded-2xl border border-border bg-card p-4">

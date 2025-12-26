@@ -35,16 +35,27 @@ export async function generateSessionSummary(sessionId: string) {
   });
 
   const payload = JSON.parse(response.output_text ?? "{}") as {
-    summary?: string;
-    sentiment?: string;
-    score?: number;
+    summary?: unknown;
+    sentiment?: unknown;
+    score?: unknown;
   };
 
-  const summaryText =
-    payload.summary ||
-    "Customer shared feedback. No additional summary was generated.";
+  const summaryText = (() => {
+    const s = payload.summary;
+    if (typeof s === "string" && s.trim()) return s.trim();
+    if (Array.isArray(s)) {
+      const items = s
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter(Boolean)
+        .slice(0, 8);
+      if (items.length) return `- ${items.join("\n- ")}`;
+    }
+    return "Customer shared feedback. No additional summary was generated.";
+  })();
 
-  const sentiment = toSentiment(payload.sentiment || "NEUTRAL") as Sentiment;
+  const sentiment = toSentiment(
+    typeof payload.sentiment === "string" ? payload.sentiment : "NEUTRAL",
+  ) as Sentiment;
   const score =
     typeof payload.score === "number"
       ? Math.max(0, Math.min(1, payload.score))
