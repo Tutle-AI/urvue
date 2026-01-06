@@ -4,6 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { ReactNode, useState, useEffect, useRef } from "react";
+import { DashboardTopBar } from "./dashboard-topbar";
+
+type Location = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type DashboardShellProps = {
+  children: ReactNode;
+  businessName?: string;
+  locations?: Location[];
+};
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
@@ -21,26 +34,26 @@ function NavIcon({ icon }: { icon: string }) {
   switch (icon) {
     case "grid":
       return (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
         </svg>
       );
     case "chat":
       return (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       );
     case "map":
       return (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       );
     case "cog":
       return (
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
@@ -56,8 +69,45 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-full flex-col p-5">
       <div className="flex items-center justify-between">
-        <Link href="/dashboard" className="text-lg font-semibold text-foreground" onClick={onClose}>
-          URVUE
+        <Link 
+          href="/dashboard" 
+          id="dashboardLogoLink"
+          className="flex items-center gap-2.5 font-serif text-lg font-normal tracking-tight text-foreground" 
+          onClick={onClose}
+        >
+          <span className="inline-flex h-9 w-[45px] items-center justify-center">
+            <svg
+              viewBox="0 0 56 32"
+              className="h-full w-full"
+              role="img"
+              aria-label="Urvue logo"
+            >
+              <circle cx="20" cy="16" r="14" fill="#F3E9D8" />
+              <circle cx="36" cy="16" r="14" fill="#D3613A">
+                <animate
+                  attributeName="cx"
+                  dur="700ms"
+                  repeatCount="1"
+                  begin="dashboardLogoLink.mouseover"
+                  values="36;20;19.25;20.75;19.6;20.4;36"
+                  keyTimes="0;0.45;0.55;0.65;0.75;0.82;1"
+                  fill="remove"
+                />
+                <animateTransform
+                  attributeName="transform"
+                  attributeType="XML"
+                  type="rotate"
+                  dur="700ms"
+                  repeatCount="1"
+                  begin="dashboardLogoLink.mouseover"
+                  values="0 36 16;0 20 16;-8 20 16;8 20 16;-6 20 16;6 20 16;0 36 16"
+                  keyTimes="0;0.45;0.55;0.65;0.75;0.82;1"
+                  fill="remove"
+                />
+              </circle>
+            </svg>
+          </span>
+          UrVue
         </Link>
         {onClose && (
           <button
@@ -80,7 +130,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+              className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[15px] font-medium transition ${
                 active
                   ? "bg-primary/15 text-primary"
                   : "text-muted hover:bg-card/60 hover:text-foreground"
@@ -92,23 +142,15 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           );
         })}
       </nav>
-
-      <div className="mt-auto pt-6">
-        <div className="rounded-2xl border border-border bg-card/50 p-4">
-          <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-foreground">Account</div>
-              <div className="truncate text-xs text-muted">Manage profile</div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({ 
+  children, 
+  businessName = "", 
+  locations = [] 
+}: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const prevPathname = useRef(pathname);
@@ -147,10 +189,53 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <Link href="/dashboard" className="text-lg font-semibold text-foreground">
-          URVUE
+        <Link 
+          href="/dashboard"
+          id="mobileLogoLink"
+          className="flex items-center gap-2 font-serif text-lg font-normal tracking-tight text-foreground"
+        >
+          <span className="inline-flex h-8 w-10 items-center justify-center">
+            <svg
+              viewBox="0 0 56 32"
+              className="h-full w-full"
+              role="img"
+              aria-label="Urvue logo"
+            >
+              <circle cx="20" cy="16" r="14" fill="#F3E9D8" />
+              <circle cx="36" cy="16" r="14" fill="#D3613A">
+                <animate
+                  attributeName="cx"
+                  dur="700ms"
+                  repeatCount="1"
+                  begin="mobileLogoLink.mouseover"
+                  values="36;20;19.25;20.75;19.6;20.4;36"
+                  keyTimes="0;0.45;0.55;0.65;0.75;0.82;1"
+                  fill="remove"
+                />
+                <animateTransform
+                  attributeName="transform"
+                  attributeType="XML"
+                  type="rotate"
+                  dur="700ms"
+                  repeatCount="1"
+                  begin="mobileLogoLink.mouseover"
+                  values="0 36 16;0 20 16;-8 20 16;8 20 16;-6 20 16;6 20 16;0 36 16"
+                  keyTimes="0;0.45;0.55;0.65;0.75;0.82;1"
+                  fill="remove"
+                />
+              </circle>
+            </svg>
+          </span>
+          UrVue
         </Link>
-        <UserButton afterSignOutUrl="/" />
+        <UserButton
+          afterSignOutUrl="/"
+          appearance={{
+            elements: {
+              avatarBox: "h-8 w-8",
+            },
+          }}
+        />
       </header>
 
       {/* Mobile drawer overlay */}
@@ -178,12 +263,23 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        {/* Main content */}
-        <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
+        {/* Main content area with top bar */}
+        <div className="min-w-0 flex-1 flex flex-col">
+          {/* Desktop top bar */}
+          {businessName && (
+            <DashboardTopBar
+              businessName={businessName}
+              locations={locations}
+            />
+          )}
+
+          {/* Main content */}
+          <main className="flex-1">
+            <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
