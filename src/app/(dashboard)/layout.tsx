@@ -1,52 +1,37 @@
 import { ReactNode } from "react";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { prisma } from "@/lib/db";
+import { getPrimarySpace, requireAccountContext } from "@/lib/business";
+import { featureEnabled } from "@/lib/features";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const user = await currentUser();
-  if (!user) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/sign-in");
   }
-
-  // Fetch business data for the top bar
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
-  });
+  const { account } = await requireAccountContext();
 
   let businessName = "";
   let locations: { id: string; name: string; slug: string }[] = [];
+  let kiriContext: { accountId: string; spaceId: string } | undefined;
 
-  if (dbUser) {
-    const business = await prisma.business.findFirst({
-      where: { ownerId: dbUser.id },
-      include: {
-        locations: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
-      },
-    });
+  {
+    const space = await getPrimarySpace(account.id);
 
-    if (business) {
-      businessName = business.name;
-      locations = business.locations;
+    if (space) {
+      businessName = space.name;
+      locations = space.feedbackPoints;
+      if (space.accountId && featureEnabled("kiri")) kiriContext = { accountId: space.accountId, spaceId: space.id };
     }
   }
 
   return (
-    <DashboardShell businessName={businessName} locations={locations}>
+    <DashboardShell businessName={businessName} locations={locations} kiriContext={kiriContext}>
       {children}
     </DashboardShell>
   );

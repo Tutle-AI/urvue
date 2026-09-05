@@ -55,7 +55,7 @@ export function DashboardTopBar({
   return (
     <header className="hidden border-b border-border bg-surface/40 lg:block">
       <div className="flex h-16 items-center justify-between px-6">
-        {/* Left side: Business name and location selector */}
+        {/* Left side: Business name and feedback link selector */}
         <div className="flex items-center gap-6">
           {/* Business name */}
           <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ export function DashboardTopBar({
                 />
               </svg>
               <span className="max-w-[180px] truncate">
-                {currentLocation?.name || "Select location"}
+                {currentLocation?.name || "Select feedback link"}
               </span>
               <svg
                 className={`h-4 w-4 text-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -121,11 +121,11 @@ export function DashboardTopBar({
             {/* Dropdown menu */}
             {isOpen && (
               <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
-                {/* Locations list */}
+                {/* Feedback link list */}
                 <div className="max-h-64 overflow-y-auto p-1.5">
                   {locations.length === 0 ? (
                     <div className="px-3 py-4 text-center text-sm text-muted">
-                      No locations yet
+                      No feedback links yet
                     </div>
                   ) : (
                     locations.map((location) => (
@@ -133,7 +133,7 @@ export function DashboardTopBar({
                         key={location.id}
                         onClick={() => {
                           setIsOpen(false);
-                          // For now, just close. We can add location switching logic later
+                          // Feedback-link scoped dashboard filters can be added here later.
                         }}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
                           location.id === currentLocation?.id
@@ -213,7 +213,7 @@ export function DashboardTopBar({
                         />
                       </svg>
                     </span>
-                    <span>Add new location</span>
+                    <span>Add feedback link</span>
                   </Link>
                 </div>
               </div>

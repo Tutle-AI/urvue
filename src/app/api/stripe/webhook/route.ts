@@ -41,7 +41,7 @@ export async function POST(request: Request) {
             ? "STARTER"
             : "STARTER";
 
-      await prisma.business.updateMany({
+      await prisma.account.updateMany({
         where: { stripeCustomerId: customerId },
         data: {
           stripeSubscriptionId: subscription.id as string,
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
-      await prisma.business.updateMany({
+      await prisma.account.updateMany({
         where: { stripeCustomerId: customerId },
         data: {
           plan: "STARTER",

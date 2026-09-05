@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 
 export async function SiteHeader() {
-  const user = await currentUser();
+  const { userId } = await auth();
 
   return (
     <header className="flex items-center justify-between py-6 md:py-8">
@@ -17,7 +17,7 @@ export async function SiteHeader() {
             viewBox="0 0 56 32"
             className="h-full w-full"
             role="img"
-            aria-label="Urvue logo"
+            aria-label="UrVue logo"
           >
             <circle cx="20" cy="16" r="14" fill="#F3E9D8" />
             <circle cx="36" cy="16" r="14" fill="#D3613A">
@@ -65,10 +65,10 @@ export async function SiteHeader() {
 
       {/* Right CTA */}
       <Link
-        href={user ? "/dashboard" : "/sign-up"}
+        href={userId ? "/dashboard" : "/sign-up"}
         className="rounded-full border border-foreground/30 px-6 py-2.5 text-sm font-medium text-foreground transition hover:border-foreground hover:bg-foreground/5 md:text-base"
       >
-        {user ? "Dashboard" : "Get started"}
+        {userId ? "Dashboard" : "Get started"}
       </Link>
     </header>
   );

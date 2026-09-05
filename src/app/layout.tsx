@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "URVUE | Feedback that feels human",
+  title: "UrVue | Feedback that feels human",
   description:
-    "URVUE captures real conversations, summarizes insights, and surfaces trends for modern businesses.",
+    "UrVue captures real conversations, summarizes insights, and surfaces trends for modern businesses.",
 };
 
 export default function RootLayout({

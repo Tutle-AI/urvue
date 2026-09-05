@@ -12,9 +12,30 @@ enum Plan {
   PRO
 }
 
+enum AccountRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum AgentPersona {
+  AMANDA
+  DEREK
+  PROFESSIONAL
+  DIRECT
+}
+
 enum SessionStatus {
   ACTIVE
   CLOSED
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+  SKIPPED
 }
 
 enum MessageRole {
@@ -29,15 +50,118 @@ enum Sentiment {
   NEGATIVE
 }
 
-model User {
-  id         String     @id @default(cuid())
-  clerkId    String     @unique
-  email      String
-  businesses Business[]
-  createdAt  DateTime   @default(now())
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
-model Business {
+enum ReturnIntent {
+  YES
+  MAYBE
+  NO
+  UNKNOWN
+}
+
+enum FindingKind {
+  TOPIC
+  PRAISE
+  COMPLAINT
+  COMPLIMENT
+  SUGGESTION
+  ACTIONABLE_ISSUE
+}
+
+enum EntityType {
+  PERSON
+  PRODUCT
+  SERVICE
+  LOCATION
+}
+
+enum ContextSource {
+  ONBOARDING
+  KIRI
+  SYSTEM
+}
+
+enum ChangeStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum PatternStrength {
+  ISOLATED
+  EMERGING
+  ESTABLISHED
+}
+
+enum InsightType {
+  GOING_WELL
+  NEEDS_ATTENTION
+  CHANGED
+  RECOMMENDATION
+}
+
+enum JobKind {
+  ANALYZE_CONVERSATION
+  REFRESH_SPACE_INSIGHTS
+  GENERATE_WEEKLY_REPORT
+  SEND_WEEKLY_REPORT
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum KiriMessageRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id           String              @id @default(cuid())
+  clerkId      String              @unique
+  email        String
+  legacySpaces Space[]             @relation("LegacySpaceOwner")
+  memberships  AccountMembership[]
+  createdAt    DateTime            @default(now())
+}
+
+model Account {
+  id                   String              @id @default(cuid())
+  name                 String
+  memberships          AccountMembership[]
+  spaces               Space[]
+  kiriThreads          KiriThread[]
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?             @unique
+  plan                 Plan                @default(STARTER)
+  trialEndsAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+}
+
+model AccountMembership {
+  id        String      @id @default(cuid())
+  account   Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      AccountRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+
+  @@unique([accountId, userId])
+  @@index([userId])
+}
+
+// Space is mapped to the existing Business table for a safe, data-preserving cutover.
+model Space {
   id                    String             @id @default(cuid())
   name                  String
   slug                  String             @unique
@@ -46,56 +170,301 @@ model Business {
   focusTopic1           String?
   focusTopic2           String?
   focusTopic3           String?
+  agentPersona          AgentPersona       @default(AMANDA)
   onboardingCompletedAt DateTime?
-  owner                 User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  account               Account?           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId             String?
+  legacyOwner           User               @relation("LegacySpaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId               String
-  locations             Location[]
-  stripeCustomerId      String?            @unique
-  stripeSubscriptionId  String?            @unique
-  plan                  Plan               @default(STARTER)
+  feedbackPoints        FeedbackPoint[]
+  goals                 SpaceGoal[]
+  trackedEntities       TrackedEntity[]
+  businessChanges       BusinessChange[]
+  insights              Insight[]
+  jobs                  IntelligenceJob[]
+  kiriThreads           KiriThread[]
+  // Transitional billing fields retained until the account cutover is verified.
+  stripeCustomerId      String?             @unique
+  stripeSubscriptionId  String?             @unique
+  plan                  Plan                @default(STARTER)
   trialEndsAt           DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([accountId])
+  @@map("Business")
 }
 
-model Location {
-  id         String            @id @default(cuid())
-  business   Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessId String
-  name       String
-  slug       String            @unique
-  sessions   FeedbackSession[]
-  createdAt  DateTime          @default(now())
+model SpaceGoal {
+  id        String        @id @default(cuid())
+  space     Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId   String
+  label     String
+  priority  Int           @default(0)
+  source    ContextSource @default(ONBOARDING)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([spaceId, active])
 }
 
-model FeedbackSession {
-  id         String            @id @default(cuid())
-  location   Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  locationId String
-  customerName String?
-  status     SessionStatus     @default(ACTIVE)
-  messages   FeedbackMessage[]
-  summary    FeedbackSummary?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+model TrackedEntity {
+  id        String          @id @default(cuid())
+  space     Space           @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId   String
+  type      EntityType
+  name      String
+  source    ContextSource   @default(ONBOARDING)
+  active    Boolean         @default(true)
+  mentions  EntityMention[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([spaceId, type, name])
+  @@index([spaceId, type])
 }
 
-model FeedbackMessage {
-  id        String           @id @default(cuid())
-  session   FeedbackSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String
-  role      MessageRole
-  content   String
-  createdAt DateTime         @default(now())
+model BusinessChange {
+  id            String        @id @default(cuid())
+  space         Space         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId       String
+  title         String
+  description   String?
+  effectiveFrom DateTime?
+  status        ChangeStatus  @default(ACTIVE)
+  source        ContextSource @default(ONBOARDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([spaceId, status])
 }
 
+// FeedbackPoint is mapped to the existing Location table; public slugs stay valid.
+model FeedbackPoint {
+  id            String         @id @default(cuid())
+  space         Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId       String         @map("businessId")
+  name          String
+  slug          String         @unique
+  conversations Conversation[]
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  @@index([spaceId])
+  @@map("Location")
+}
+
+model Conversation {
+  id              String                @id @default(cuid())
+  feedbackPoint   FeedbackPoint         @relation(fields: [feedbackPointId], references: [id], onDelete: Cascade)
+  feedbackPointId String                @map("locationId")
+  customerName    String?
+  status          SessionStatus         @default(ACTIVE)
+  analysisStatus  AnalysisStatus        @default(PENDING)
+  accessTokenHash String?
+  messages        ConversationMessage[]
+  legacySummary   FeedbackSummary?
+  legacyInsight   FeedbackInsight?
+  analysis        ConversationAnalysis?
+  insightEvidence InsightEvidence[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  closedAt        DateTime?
+
+  @@index([feedbackPointId, createdAt])
+  @@index([accessTokenHash])
+  @@map("FeedbackSession")
+}
+
+model ConversationMessage {
+  id             String            @id @default(cuid())
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String            @map("sessionId")
+  role           MessageRole
+  content        String
+  findings       AnalysisFinding[] @relation("FindingEvidenceMessage")
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("FeedbackMessage")
+}
+
+model ConversationAnalysis {
+  id             String            @id @default(cuid())
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String            @unique
+  summary        String
+  sentiment      Sentiment         @default(NEUTRAL)
+  satisfaction   Float?
+  confidence     Float?
+  severity       Severity          @default(MEDIUM)
+  returnIntent   ReturnIntent      @default(UNKNOWN)
+  version        Int               @default(1)
+  provenance     String            @default("ai")
+  findings       AnalysisFinding[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([sentiment])
+}
+
+model AnalysisFinding {
+  id               String                @id @default(cuid())
+  analysis          ConversationAnalysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  analysisId        String
+  kind              FindingKind
+  label             String
+  detail            String?
+  sentiment         Sentiment?
+  severity          Severity?
+  confidence        Float?
+  evidenceMessage   ConversationMessage?  @relation("FindingEvidenceMessage", fields: [evidenceMessageId], references: [id], onDelete: SetNull)
+  evidenceMessageId String?
+  entityMentions    EntityMention[]
+  insightEvidence   InsightEvidence[]
+  createdAt         DateTime              @default(now())
+
+  @@index([analysisId, kind])
+  @@index([kind, label])
+  @@index([label])
+}
+
+model EntityMention {
+  id         String          @id @default(cuid())
+  finding    AnalysisFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId  String
+  entity     TrackedEntity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  entityId   String
+  sentiment  Sentiment?
+  confidence Float?
+
+  @@unique([findingId, entityId])
+  @@index([entityId])
+}
+
+model Insight {
+  id              String            @id @default(cuid())
+  space           Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId         String
+  type            InsightType
+  title           String
+  observation     String
+  recommendation  String?
+  confidence      Float?
+  patternStrength PatternStrength
+  evidenceCount   Int               @default(0)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  evidence        InsightEvidence[]
+  active          Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([spaceId, type, active])
+}
+
+model InsightEvidence {
+  id             String           @id @default(cuid())
+  insight        Insight          @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  insightId      String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  finding        AnalysisFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  findingId      String?
+  excerpt        String?
+
+  @@unique([insightId, conversationId, findingId])
+  @@index([conversationId])
+}
+
+model IntelligenceJob {
+  id          String    @id @default(cuid())
+  kind        JobKind
+  status      JobStatus @default(PENDING)
+  dedupeKey   String    @unique
+  payload     Json
+  space       Space?    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId     String?
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAt       DateTime  @default(now())
+  lockedAt    DateTime?
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAt])
+  @@index([spaceId])
+}
+
+model KiriThread {
+  id        String        @id @default(cuid())
+  account   Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId String
+  space     Space?        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  spaceId   String?
+  title     String?
+  messages  KiriMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([accountId, updatedAt])
+  @@index([spaceId])
+}
+
+model KiriMessage {
+  id          String          @id @default(cuid())
+  thread      KiriThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId    String
+  role        KiriMessageRole
+  content     String
+  pageContext Json?
+  citations   Json?
+  createdAt   DateTime        @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model RateLimitWindow {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+// Transitional legacy records stay until analysis-v2 reconciliation is complete.
 model FeedbackSummary {
-  id        String           @id @default(cuid())
-  session   FeedbackSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId String           @unique
-  summary   String
-  sentiment Sentiment        @default(NEUTRAL)
-  score     Float?
-  createdAt DateTime         @default(now())
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String       @unique @map("sessionId")
+  summary        String
+  sentiment      Sentiment    @default(NEUTRAL)
+  score          Float?
+  createdAt      DateTime     @default(now())
+
+  @@map("FeedbackSummary")
 }
 
+model FeedbackInsight {
+  id                String       @id @default(cuid())
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId    String       @unique @map("sessionId")
+  summary           String
+  sentiment         Sentiment    @default(NEUTRAL)
+  satisfactionScore Float?
+  confidence        Float?
+  urgency           String       @default("medium")
+  themes            String[]     @default([])
+  painPoints        String[]     @default([])
+  praise            String[]     @default([])
+  featureRequests   String[]     @default([])
+  suggestedActions  String[]     @default([])
+  quote             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("FeedbackInsight")
+}

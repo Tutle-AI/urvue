@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UrVue
 
-## Getting Started
+UrVue is an AI-led customer-intelligence service for customer-facing businesses. An owner
+sets up a Space, shares a Feedback Point, and receives evidence-backed patterns from short,
+adaptive customer conversations. Kiri answers questions from normalized findings and links
+material conclusions back to their supporting conversations.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router
+- React and Tailwind CSS
+- Clerk authentication
+- Prisma with PostgreSQL
+- OpenAI Responses API
+- Stripe subscriptions
+
+## Core Flow
+
+1. A business signs up and describes its customer experience.
+2. UrVue creates a feedback link such as `/feedback/main-feedback`.
+3. A customer opens the link and chats with the UrVue assistant.
+4. Closing the conversation immediately shows a thank-you state and enqueues durable analysis.
+5. The worker writes versioned analysis and normalized findings without changing the transcript.
+6. The dashboard and Kiri surface conclusions with sample sizes, confidence, and evidence links.
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Useful checks:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run verify:data
+npx prisma generate
+```
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+Copy `env.example` to `.env.local` and provide:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `DATABASE_URL`
+- `NEXT_PUBLIC_APP_URL`
+- Clerk keys
+- `OPENAI_API_KEY`
+- Stripe secret, webhook secret, and price IDs
+- `CRON_SECRET` in production, used to protect the scheduled intelligence worker
+- `FEATURE_NEW_ONBOARDING`, `FEATURE_PUBLIC_CONVERSATIONS`, `FEATURE_ANALYSIS_V2`,
+  `FEATURE_INTELLIGENCE_DASHBOARD`, and `FEATURE_KIRI` rollout switches (enabled unless set to `false`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database
 
-## Deploy on Vercel
+The Prisma schema uses Accounts, memberships, Spaces, Feedback Points, Conversations,
+normalized analysis, evidence-backed Insights, Kiri history, and a PostgreSQL-backed job queue.
+The renamed models map to the existing physical tables so historical IDs and `/feedback/[slug]`
+links remain intact. Legacy summaries and insights remain available during the dual-read release.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Apply checked-in migrations in deployed environments:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+`vercel.json` invokes `/api/internal/jobs/run` every minute. For local development, the worker
+can be invoked directly; production requests require `Authorization: Bearer $CRON_SECRET`.
+
+For an existing pre-migration database, run `node scripts/migrate-vision.mjs` once after the
+migrations. The script is idempotent: it creates Accounts and memberships, links existing Spaces,
+converts legacy analyses, skips empty historical conversations, and queues the remaining history.
+Run `npm run verify:data -- --baseline` during this cutover to assert the preserved 2/2/2/2/9/89
+historical baseline as well as legacy records, job health, Account assignment, and Insight evidence.

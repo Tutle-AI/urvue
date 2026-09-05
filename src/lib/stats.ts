@@ -1,216 +1,133 @@
-import { prisma } from "./db";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 export type BusinessStats = {
   totalSessions: number;
-  activeSessions: number;
   summarizedSessions: number;
-  avgScore: number | null;
-  sentimentBreakdown: {
-    positive: number;
-    neutral: number;
-    negative: number;
-    pending: number;
-  };
+  sentimentBreakdown: { positive: number; neutral: number; negative: number; pending: number };
   thisWeekSessions: number;
-  lastWeekSessions: number;
 };
+export type LocationStat = { id: string; name: string; slug: string; sessionCount: number; lastActivity: Date | null };
+export type RankedInsight = { label: string; count: number };
 
-export type SentimentTrendPoint = {
-  date: string;
-  positive: number;
-  neutral: number;
-  negative: number;
-};
-
-export type LocationStat = {
-  id: string;
-  name: string;
-  slug: string;
-  sessionCount: number;
-  lastActivity: Date | null;
-};
-
-export async function getBusinessStats(businessId: string): Promise<BusinessStats> {
+export async function getBusinessStats(spaceId: string): Promise<BusinessStats> {
   const now = new Date();
   const startOfThisWeek = new Date(now);
   startOfThisWeek.setDate(now.getDate() - now.getDay());
   startOfThisWeek.setHours(0, 0, 0, 0);
-
-  const startOfLastWeek = new Date(startOfThisWeek);
-  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
-
-  // Get all sessions for this business
-  const sessions = await prisma.feedbackSession.findMany({
-    where: { location: { businessId } },
-    include: { summary: true },
-  });
-
-  const totalSessions = sessions.length;
-  const activeSessions = sessions.filter((s) => s.status === "ACTIVE").length;
-  const summarizedSessions = sessions.filter((s) => s.summary).length;
-
-  // Calculate sentiment breakdown
-  const summaries = sessions.map((s) => s.summary).filter(Boolean);
-  const positive = summaries.filter((s) => s?.sentiment === "POSITIVE").length;
-  const neutral = summaries.filter((s) => s?.sentiment === "NEUTRAL").length;
-  const negative = summaries.filter((s) => s?.sentiment === "NEGATIVE").length;
-  const pending = totalSessions - summaries.length;
-
-  // Average score
-  const scores = summaries.map((s) => s?.score).filter((s): s is number => s !== null);
-  const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-
-  // This week vs last week
-  const thisWeekSessions = sessions.filter(
-    (s) => s.createdAt >= startOfThisWeek
-  ).length;
-  const lastWeekSessions = sessions.filter(
-    (s) => s.createdAt >= startOfLastWeek && s.createdAt < startOfThisWeek
-  ).length;
-
+  const conversationWhere = { feedbackPoint: { spaceId } };
+  const analysisWhere = { conversation: { feedbackPoint: { spaceId } } };
+  const [statusRows, sentimentRows, thisWeek] = await Promise.all([
+    prisma.conversation.groupBy({ by: ["analysisStatus"], where: conversationWhere, _count: { _all: true } }),
+    prisma.conversationAnalysis.groupBy({ by: ["sentiment"], where: analysisWhere, _count: { _all: true } }),
+    prisma.conversation.count({ where: { ...conversationWhere, createdAt: { gte: startOfThisWeek } } }),
+  ]);
+  const statusCount = (status: "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED" | "SKIPPED") => statusRows.find((row) => row.analysisStatus === status)?._count._all || 0;
+  const total = statusRows.reduce((sum, row) => sum + row._count._all, 0);
+  const analyzed = statusCount("COMPLETE");
+  const sentimentCount = (sentiment: "POSITIVE" | "NEUTRAL" | "NEGATIVE") => sentimentRows.find((row) => row.sentiment === sentiment)?._count._all || 0;
   return {
-    totalSessions,
-    activeSessions,
-    summarizedSessions,
-    avgScore,
-    sentimentBreakdown: { positive, neutral, negative, pending },
-    thisWeekSessions,
-    lastWeekSessions,
+    totalSessions: total,
+    summarizedSessions: analyzed,
+    sentimentBreakdown: {
+      positive: sentimentCount("POSITIVE"),
+      neutral: sentimentCount("NEUTRAL"),
+      negative: sentimentCount("NEGATIVE"),
+      pending: statusCount("PENDING") + statusCount("PROCESSING"),
+    },
+    thisWeekSessions: thisWeek,
   };
 }
 
-export async function getSentimentTrend(
-  businessId: string,
-  days: number = 30
-): Promise<SentimentTrendPoint[]> {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-  startDate.setHours(0, 0, 0, 0);
-
-  const sessions = await prisma.feedbackSession.findMany({
-    where: {
-      location: { businessId },
-      createdAt: { gte: startDate },
-    },
-    include: { summary: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  // Group by date
-  const dateMap = new Map<string, { positive: number; neutral: number; negative: number }>();
-
-  // Initialize all dates
-  for (let i = 0; i <= days; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    const key = date.toISOString().split("T")[0];
-    dateMap.set(key, { positive: 0, neutral: 0, negative: 0 });
-  }
-
-  // Count sessions by sentiment
-  for (const session of sessions) {
-    const key = session.createdAt.toISOString().split("T")[0];
-    const entry = dateMap.get(key);
-    if (entry) {
-      const sentiment = session.summary?.sentiment;
-      if (sentiment === "POSITIVE") entry.positive++;
-      else if (sentiment === "NEGATIVE") entry.negative++;
-      else entry.neutral++;
-    }
-  }
-
-  return Array.from(dateMap.entries()).map(([date, counts]) => ({
-    date,
-    ...counts,
-  }));
-}
-
-export async function getLocationStats(businessId: string): Promise<LocationStat[]> {
-  const locations = await prisma.location.findMany({
-    where: { businessId },
+export async function getLocationStats(spaceId: string): Promise<LocationStat[]> {
+  const points = await prisma.feedbackPoint.findMany({
+    where: { spaceId, active: true },
     include: {
-      sessions: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { createdAt: true },
-      },
-      _count: {
-        select: { sessions: true },
-      },
+      conversations: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+      _count: { select: { conversations: true } },
     },
     orderBy: { createdAt: "asc" },
   });
-
-  return locations.map((loc) => ({
-    id: loc.id,
-    name: loc.name,
-    slug: loc.slug,
-    sessionCount: loc._count.sessions,
-    lastActivity: loc.sessions[0]?.createdAt ?? null,
+  return points.map((point) => ({
+    id: point.id,
+    name: point.name,
+    slug: point.slug,
+    sessionCount: point._count.conversations,
+    lastActivity: point.conversations[0]?.createdAt || null,
   }));
 }
 
-export async function getRecentSessions(businessId: string, limit: number = 5) {
-  return prisma.feedbackSession.findMany({
-    where: { location: { businessId } },
-    include: {
-      location: true,
-      summary: true,
+export async function getRecentSessions(spaceId: string, limit = 5) {
+  return prisma.conversation.findMany({
+    where: { feedbackPoint: { spaceId } },
+    select: {
+      id: true,
+      customerName: true,
+      createdAt: true,
+      feedbackPoint: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
 }
 
-export async function getSessionsWithFilters(
-  businessId: string,
-  options: {
-    locationId?: string;
-    sentiment?: "POSITIVE" | "NEUTRAL" | "NEGATIVE" | "PENDING";
-    search?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}
-) {
+export async function getSessionsWithFilters(spaceId: string, options: {
+  locationId?: string;
+  sentiment?: "POSITIVE" | "NEUTRAL" | "NEGATIVE" | "PENDING";
+  search?: string;
+  page?: number;
+  pageSize?: number;
+} = {}) {
   const { locationId, sentiment, search, page = 1, pageSize = 10 } = options;
-
-  // Build where clause
-  const where = {
-    location: { businessId },
-    ...(locationId && { locationId }),
-    ...(search && { customerName: { contains: search, mode: "insensitive" as const } }),
+  const where: Prisma.ConversationWhereInput = {
+    feedbackPoint: { spaceId },
+    ...(locationId ? { feedbackPointId: locationId } : {}),
+    ...(search ? { customerName: { contains: search, mode: "insensitive" } } : {}),
   };
-
-  // Get sessions with summary info
-  const allSessions = await prisma.feedbackSession.findMany({
+  if (sentiment === "PENDING") {
+    where.AND = [{ analysis: { is: null } }, { legacySummary: { is: null } }];
+  } else if (sentiment) {
+    where.OR = [
+      { analysis: { is: { sentiment } } },
+      { AND: [{ analysis: { is: null } }, { legacySummary: { is: { sentiment } } }] },
+    ];
+  }
+  const [rows, total] = await Promise.all([prisma.conversation.findMany({
     where,
-    include: {
-      location: true,
-      summary: true,
+    select: {
+      id: true,
+      customerName: true,
+      status: true,
+      analysisStatus: true,
+      createdAt: true,
+      feedbackPoint: { select: { name: true } },
+      legacySummary: { select: { summary: true, sentiment: true } },
+      analysis: {
+        select: {
+          summary: true,
+          sentiment: true,
+          findings: { select: { id: true, kind: true, label: true }, orderBy: { createdAt: "asc" }, take: 3 },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
-  });
-
-  // Filter by sentiment (including "PENDING" for sessions without summary)
-  let filtered = allSessions;
-  if (sentiment) {
-    if (sentiment === "PENDING") {
-      filtered = allSessions.filter((s) => !s.summary);
-    } else {
-      filtered = allSessions.filter((s) => s.summary?.sentiment === sentiment);
-    }
-  }
-
-  const total = filtered.length;
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  }), prisma.conversation.count({ where })]);
   const totalPages = Math.ceil(total / pageSize);
-  const start = (page - 1) * pageSize;
-  const sessions = filtered.slice(start, start + pageSize);
-
   return {
-    sessions,
+    sessions: rows,
     total,
     page,
     pageSize,
     totalPages,
   };
+}
+
+export async function getSpaceInsights(spaceId: string) {
+  return prisma.insight.findMany({
+    where: { spaceId, active: true },
+    orderBy: [{ type: "asc" }, { evidenceCount: "desc" }],
+    take: 12,
+  });
 }

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "verify:data": "node scripts/verify-vision.mjs",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
@@ -15,9 +18,7 @@
   "dependencies": {
     "@clerk/nextjs": "^6.36.1",
     "@clerk/themes": "^2.4.43",
-    "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "5.21.1",
-    "@tremor/react": "^3.18.7",
     "date-fns": "^4.1.0",
     "next": "16.0.8",
     "openai": "^6.10.0",
@@ -37,6 +38,7 @@
     "eslint-config-next": "16.0.8",
     "prisma": "5.21.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

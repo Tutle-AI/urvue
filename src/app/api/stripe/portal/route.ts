@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireDbUser } from "@/lib/auth";
+import { requireAccountContext } from "@/lib/business";
 import { env } from "@/lib/env";
-import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
 
 export async function POST() {
   try {
-    const { dbUser } = await requireDbUser();
-
-    const business = await prisma.business.findFirst({
-      where: { ownerId: dbUser.id },
-    });
-
-    if (!business?.stripeCustomerId) {
+    const { account } = await requireAccountContext();
+    if (!account.stripeCustomerId) {
       return NextResponse.json(
         { error: "No Stripe customer for this business" },
         { status: 400 },
@@ -20,7 +14,7 @@ export async function POST() {
     }
 
     const portal = await stripe.billingPortal.sessions.create({
-      customer: business.stripeCustomerId,
+      customer: account.stripeCustomerId,
       return_url: `${env.NEXT_PUBLIC_APP_URL}/dashboard`,
     });
 

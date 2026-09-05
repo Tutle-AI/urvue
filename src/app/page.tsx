@@ -1,327 +1,243 @@
 import Link from "next/link";
 import Image from "next/image";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { HomeClients, HomeFeatures } from "@/components/home-features";
 import { env } from "@/lib/env";
-import { redirect } from "next/navigation";
 
 const featureList = [
   {
-    title: "Workspaces",
+    title: "Conversational feedback",
     description:
-      "Organize your locations into Workspaces to keep your projects separate and organized, and switch between them with ease.",
+      "Replace brittle surveys with a short AI-led conversation that asks one useful question at a time.",
   },
   {
-    title: "Compact Mode",
+    title: "Guided by your goals",
     description:
-      "URVUE's Compact Mode gives you more screen real estate by hiding extra UI when you don't need it, and showing it when you do.",
+      "Tell UrVue what you care about: service, atmosphere, usability, wait times, pricing, design, or anything else.",
   },
   {
-    title: "Glance",
+    title: "Actionable insights",
     description:
-      "Glance allows you to quickly switch between your most-used tabs, without having to scroll through your history.",
+      "Every conversation becomes themes, pain points, praise, quotes, and suggested next actions.",
   },
   {
-    title: "Split View",
+    title: "Simple sharing",
     description:
-      "Split View allows you to view two tabs side by side, making it easier to compare and switch between them.",
+      "Share one feedback link on your website, receipt, account page, QR code, booking flow, or follow-up email.",
   },
 ];
 
 const clientTypes = [
   {
-    title: "Website",
+    title: "Websites and apps",
     description:
-      "Understand where users get stuck and what they expected to happen—straight from their words.",
+      "Learn where users get stuck, what they expected, and what would make the experience better.",
   },
   {
-    title: "Restaurant",
+    title: "Restaurants and cafes",
     description:
-      "Capture honest feedback about ordering, service, and atmosphere through real conversations.",
+      "Capture honest feedback about food, service, atmosphere, ordering, and repeat visits.",
   },
   {
-    title: "Event",
+    title: "Barbers, salons, and groomers",
     description:
-      "Collect reactions while the experience is fresh—from check-in to the closing moments.",
+      "Understand what customers loved, what felt off, and what would make them come back.",
   },
   {
-    title: "Barber",
+    title: "Retail, venues, and services",
     description:
-      "Learn what customers loved (or didn’t) so you can refine the experience and build loyalty.",
+      "Turn everyday customer experiences into clear themes, quotes, and decisions.",
   },
 ];
 
+function DashboardPreview() {
+  return (
+    <div className="mx-auto w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+      <div className="grid min-h-[520px] md:grid-cols-[240px_1fr]">
+        <aside className="hidden border-r border-border bg-surface p-5 md:block">
+          <div className="font-serif text-xl text-foreground">UrVue</div>
+          <div className="mt-8 space-y-2 text-sm">
+            {["Overview", "Sessions", "Feedback links", "Settings"].map((item, index) => (
+              <div
+                key={item}
+                className={`rounded-xl px-3 py-2 ${
+                  index === 0
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted"
+                }`}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="text-xs text-muted">This week</div>
+            <div className="mt-2 text-3xl font-semibold text-foreground">42</div>
+            <div className="mt-1 text-xs text-muted">feedback conversations</div>
+          </div>
+        </aside>
+        <div className="p-5 md:p-6">
+          <div className="flex items-center justify-between gap-4 border-b border-border pb-5">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted">
+                Freakycast
+              </div>
+              <div className="mt-1 text-xl font-semibold text-foreground">
+                Feedback command center
+              </div>
+            </div>
+            <div className="rounded-full bg-primary/15 px-3 py-1 text-xs text-primary">
+              6 high-priority insights
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            {[
+              ["Top theme", "Dark mode polish"],
+              ["Satisfaction", "4.2/5"],
+              ["Next action", "Fix profile contrast"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl bg-surface/70 p-4">
+                <div className="text-xs text-muted">{label}</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+            <div className="rounded-2xl border border-border bg-surface/50 p-5">
+              <div className="text-sm font-medium text-foreground">
+                Recurring pain points
+              </div>
+              <div className="mt-4 space-y-3">
+                {[
+                  ["Movie cards feel cramped on mobile", "18"],
+                  ["Users want clearer watchlist controls", "12"],
+                  ["Profile colors are hard to read", "9"],
+                ].map(([label, count]) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between rounded-xl bg-card/70 px-4 py-3"
+                  >
+                    <span className="text-sm text-foreground">{label}</span>
+                    <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs text-primary">
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5">
+              <div className="text-xs uppercase tracking-wide text-muted">
+                Customer quote
+              </div>
+              <p className="mt-3 text-lg leading-relaxed text-foreground">
+                &quot;I love the horror lists, but the account page makes it hard to
+                find my saved movies.&quot;
+              </p>
+              <div className="mt-4 text-sm text-muted">
+                Turned into a theme, a pain point, and a suggested action.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function Home() {
-  const user = await currentUser();
-  if (user) {
+  const { userId } = await auth();
+  if (userId) {
     redirect("/dashboard");
   }
 
   const feedbackSlug = "urvue";
   const feedbackPath = `/feedback/${feedbackSlug}`;
   const feedbackUrl = `${env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}${feedbackPath}`;
+
   return (
     <main className="bg-background text-foreground">
-      {/* Landing (dark) */}
       <section className="bg-background">
-        {/* Keep initial viewport fully dark */}
         <div className="mx-auto flex min-h-[100svh] max-w-7xl flex-col px-6">
           <SiteHeader />
 
-          <div className="pt-24 text-center md:pt-28 lg:pt-32">
-            <div className="mx-auto max-w-5xl">
-              <h1 className="font-serif text-6xl font-normal leading-[0.95] tracking-tight md:text-7xl lg:text-8xl">
-                clear <span className="italic">feedback</span>
-                <br />
-                from conversations
+          <div className="grid flex-1 gap-10 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-20">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-primary">
+                AI customer feedback for real businesses
+              </div>
+              <h1 className="mt-5 font-serif text-6xl font-normal leading-[0.95] tracking-tight md:text-7xl">
+                clear feedback from real conversations
               </h1>
-              <p className="mx-auto mt-6 max-w-2xl text-sm text-muted md:text-base">
-                Collect real feedback from your customers from their real
-                conversations.
-                <br />
-                Get real insights based on the real data they give you.
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
+                UrVue gives your customers one simple feedback link, then turns
+                their conversation into themes, quotes, pain points, praise, and
+                suggested actions for your team.
               </p>
 
-              {/* CTA Buttons */}
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              <div className="mt-9 flex flex-wrap gap-4">
                 <Link
                   href="/sign-up"
-                  className="flex items-center gap-2 rounded-full border border-foreground/30 bg-transparent px-8 py-3.5 text-[15px] font-medium text-foreground transition hover:border-foreground hover:bg-foreground/5 md:text-base"
+                  className="rounded-full bg-foreground px-7 py-3 text-sm font-medium text-background transition hover:bg-foreground/90"
                 >
                   Start free trial
-                  <span className="text-xs">→</span>
                 </Link>
                 <Link
-                  href="/sign-in"
-                  className="flex items-center gap-2 rounded-full bg-foreground px-8 py-3.5 text-[15px] font-medium text-background transition hover:bg-foreground/90 md:text-base"
+                  href={feedbackPath}
+                  className="rounded-full border border-foreground/30 px-7 py-3 text-sm font-medium text-foreground transition hover:border-foreground hover:bg-foreground/5"
                 >
-                  <span className="text-[1.5em] leading-none text-primary">♥</span>
-                  Sign in
+                  Try the feedback link
                 </Link>
               </div>
 
-              {/* Social Icons */}
-              <div className="mt-8 flex items-center justify-center gap-3 text-muted">
-                <Link
-                  href="https://www.youtube.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="YouTube"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 transition hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-6 w-6 md:h-7 md:w-7"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M23.5 6.2s-.23-1.65-.94-2.38c-.9-.96-1.91-.97-2.37-1.03C16.9 2.5 12 2.5 12 2.5h-.01s-4.9 0-8.19.29c-.46.06-1.47.07-2.37 1.03C.72 4.55.5 6.2.5 6.2S0 8.14 0 10.07v1.86c0 1.93.5 3.87.5 3.87s.22 1.65.93 2.38c.9.96 2.08.93 2.6 1.03 1.89.18 8 .29 8 .29s4.91-.01 8.2-.3c.46-.05 1.47-.06 2.37-1.02.71-.73.94-2.38.94-2.38s.5-1.94.5-3.87v-1.86c0-1.93-.5-3.87-.5-3.87zM9.75 14.44V7.56l6.25 3.44-6.25 3.44z" />
-                  </svg>
-                </Link>
-
-                <Link
-                  href="https://bsky.app"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Bluesky"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 transition hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground"
-                >
-                  <svg
-                    viewBox="0 0 64 57"
-                    className="h-6 w-6 md:h-7 md:w-7"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M13.873 3.805C21.21 9.332 29.103 20.537 32 26.55v15.882c0-.338-.13.044-.41.867-1.512 4.456-7.418 21.847-20.923 7.944-7.111-7.32-3.819-14.64 9.125-16.85-7.405 1.264-15.73-.825-18.014-9.015C1.12 23.022 0 8.51 0 6.55 0-3.268 8.579-.182 13.873 3.805ZM50.127 3.805C42.79 9.332 34.897 20.537 32 26.55v15.882c0-.338.13.044.41.867 1.512 4.456 7.418 21.847 20.923 7.944 7.111-7.32 3.819-14.64-9.125-16.85 7.405 1.264 15.73-.825 18.014-9.015C62.88 23.022 64 8.51 64 6.55c0-9.818-8.578-6.732-13.873-2.745Z" />
-                  </svg>
-                </Link>
-
-                <Link
-                  href="https://www.tiktok.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="TikTok"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 transition hover:border-foreground/40 hover:bg-foreground/5 hover:text-foreground"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-6 w-6 md:h-7 md:w-7"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z" />
-                  </svg>
-                </Link>
-              </div>
-
-              {/* Hero Visual (stand-in): directly under social, overlaps into light */}
-              <div className="mt-10">
-                <div className="mx-auto w-full max-w-7xl">
-                  <div className="-mb-28 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl md:-mb-36 lg:-mb-44">
-                    <div className="flex h-[420px] md:h-[520px] lg:h-[620px]">
-                      {/* Left sidebar mockup */}
-                      <div className="hidden w-64 border-r border-border bg-surface p-6 md:block">
-                        <div className="mb-5 text-xs text-muted">app.urvue.app</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 rounded bg-primary/20 px-3 py-2 text-sm text-primary">
-                            <span className="h-2.5 w-2.5 rounded-full bg-primary"></span>
-                            Dashboard
-                          </div>
-                          <div className="flex items-center gap-2 rounded px-3 py-2 text-sm text-muted">
-                            <span className="h-2.5 w-2.5 rounded-full bg-muted"></span>
-                            Locations
-                          </div>
-                          <div className="flex items-center gap-2 rounded px-3 py-2 text-sm text-muted">
-                            <span className="h-2.5 w-2.5 rounded-full bg-muted"></span>
-                            Sessions
-                          </div>
-                        </div>
-
-                        <div className="mt-8 rounded-xl border border-border bg-card/50 p-4">
-                          <div className="text-xs text-muted">This week</div>
-                          <div className="mt-2 text-2xl font-semibold text-foreground">
-                            128
-                          </div>
-                          <div className="mt-1 text-xs text-muted">
-                            new feedback items
-                          </div>
-                          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-border">
-                            <div className="h-full w-2/3 rounded-full bg-primary/70"></div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Main content area */}
-                      <div className="flex flex-1 flex-col">
-                        {/* Top bar */}
-                        <div className="flex items-center justify-between border-b border-border bg-surface/60 px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-card"></div>
-                            <div className="text-left">
-                              <div className="text-sm font-medium">URVUE</div>
-                              <div className="text-xs text-muted">
-                                Dashboard preview
-                              </div>
-                            </div>
-                          </div>
-                          <div className="hidden items-center gap-2 md:flex">
-                            <div className="h-9 w-28 rounded-full bg-card"></div>
-                            <div className="h-9 w-9 rounded-full bg-card"></div>
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="grid flex-1 gap-6 p-6 md:grid-cols-2">
-                          <div className="rounded-2xl border border-border bg-surface/40 p-6">
-                            <div className="text-xs text-muted">
-                              Feedback sentiment
-                            </div>
-                            <div className="mt-4 h-28 w-full rounded-xl bg-gradient-to-br from-primary/30 to-accent/15"></div>
-                            <div className="mt-5 space-y-3">
-                              <div className="h-3 w-5/6 rounded bg-border"></div>
-                              <div className="h-3 w-2/3 rounded bg-border"></div>
-                              <div className="h-3 w-1/2 rounded bg-border"></div>
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-border bg-surface/40 p-6">
-                            <div className="text-xs text-muted">
-                              Latest sessions
-                            </div>
-                            <div className="mt-5 space-y-4">
-                              <div className="flex items-center justify-between rounded-xl bg-card/60 px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-border"></div>
-                                  <div>
-                                    <div className="text-sm font-medium">
-                                      Checkout flow
-                                    </div>
-                                    <div className="text-xs text-muted">
-                                      2m ago
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted">+12</div>
-                              </div>
-                              <div className="flex items-center justify-between rounded-xl bg-card/60 px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-border"></div>
-                                  <div>
-                                    <div className="text-sm font-medium">
-                                      Pricing page
-                                    </div>
-                                    <div className="text-xs text-muted">
-                                      18m ago
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted">+7</div>
-                              </div>
-                              <div className="flex items-center justify-between rounded-xl bg-card/60 px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-border"></div>
-                                  <div>
-                                    <div className="text-sm font-medium">
-                                      Onboarding
-                                    </div>
-                                    <div className="text-xs text-muted">
-                                      1h ago
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted">+4</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="mt-8 grid max-w-xl gap-3 text-sm text-muted sm:grid-cols-3">
+                <div>Setup in minutes</div>
+                <div>No survey builder</div>
+                <div>Built on OpenAI</div>
               </div>
             </div>
-          </div>
 
+            <DashboardPreview />
+          </div>
         </div>
       </section>
 
-      {/* Features Section - Light */}
       <section
         id="features"
-        className="bg-light px-6 pb-24 pt-44 text-background md:pt-56 lg:pt-64"
+        className="bg-light px-6 py-24 text-background"
       >
         <HomeFeatures features={featureList} />
       </section>
 
-      {/* Clients Section - Dark */}
-      <section
-        id="clients"
-        className="bg-background px-6 pb-24 pt-44 md:pt-56 lg:pt-64"
-      >
+      <section id="clients" className="bg-background px-6 py-24">
         <HomeClients clients={clientTypes} />
       </section>
 
-      {/* Give us your feedback - Light */}
       <section
         id="feedback"
-        className="bg-light px-6 pb-20 pt-44 text-background md:pb-24 md:pt-56 lg:pt-64"
+        className="bg-light px-6 py-24 text-background"
       >
         <div className="mx-auto max-w-6xl">
           <div className="grid gap-10 md:grid-cols-[1.2fr_0.8fr] md:items-start">
             <div>
               <h2 className="font-serif text-4xl font-normal md:text-5xl">
-                Now give us your feedback
+                UrVue runs on UrVue
               </h2>
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-light-muted md:text-base">
-                We’re using URVUE on URVUE. Tell us what feels great, what feels
-                off, and what you’d change. Your feedback helps us ship a better
-                product—fast.
+                Tell us what feels sharp, what feels off, and what would make
+                this service more useful. Your conversation becomes the same
+                kind of insight a UrVue customer sees in their dashboard.
               </p>
 
               <div className="mt-8">
                 <div className="text-xs font-medium uppercase tracking-wide text-light-muted">
-                  Text link
+                  Feedback link
                 </div>
                 <div className="mt-3">
                   <Link
@@ -329,12 +245,11 @@ export default async function Home() {
                     className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/0 px-5 py-2.5 text-sm font-medium text-background transition hover:bg-background/5 md:text-base"
                   >
                     {feedbackPath}
-                    <span className="text-xs">→</span>
+                    <span aria-hidden="true">-&gt;</span>
                   </Link>
                 </div>
                 <div className="mt-2 text-xs text-light-muted">
-                  Share this link with anyone to collect feedback through a real
-                  conversation.
+                  Share one link anywhere you want better customer feedback.
                 </div>
               </div>
             </div>
@@ -359,7 +274,6 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Footer */}
       <div className="bg-light px-6 pb-12 pt-10 text-background">
         <div className="mx-auto max-w-6xl">
           <SiteFooter />

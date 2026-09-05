@@ -1,135 +1,117 @@
-import { redirect } from "next/navigation";
+import { AgentPersona, EntityType } from "@prisma/client";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireDbUser } from "@/lib/auth";
+import { ensureAccountForUser } from "@/lib/business";
 import { slugify } from "@/lib/slug";
 import { uniqueBusinessSlug, uniqueLocationSlug } from "@/lib/unique-slug";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { featureEnabled } from "@/lib/features";
 
-async function getInitialValues(ownerId: string) {
-  const business = await prisma.business.findFirst({
-    where: { ownerId },
-    include: { locations: { orderBy: { createdAt: "asc" }, take: 1 } },
-  });
-
-  return {
-    businessName: business?.name ?? "",
-    businessType: business?.businessType ?? "Website",
-    description: business?.description ?? "",
-    focusTopic1: business?.focusTopic1 ?? "",
-    focusTopic2: business?.focusTopic2 ?? "",
-    focusTopic3: business?.focusTopic3 ?? "",
-    locationName: business?.locations?.[0]?.name ?? "Main location",
-    onboardingCompletedAt: business?.onboardingCompletedAt ?? null,
-  };
+function splitList(value: FormDataEntryValue | null) {
+  return (value?.toString() || "").split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean).slice(0, 12);
 }
 
 export default async function OnboardingPage() {
+  if (!featureEnabled("newOnboarding")) notFound();
   const { dbUser } = await requireDbUser();
-  const initial = await getInitialValues(dbUser.id);
-
-  if (initial.onboardingCompletedAt) {
-    redirect("/dashboard");
-  }
+  const account = await ensureAccountForUser(dbUser);
+  const existing = await prisma.space.findFirst({
+    where: { accountId: account.id },
+    include: {
+      feedbackPoints: { orderBy: { createdAt: "asc" }, take: 1 },
+      goals: { where: { active: true }, orderBy: { priority: "asc" } },
+      trackedEntities: { where: { active: true } },
+      businessChanges: { where: { status: { in: ["PLANNED", "ACTIVE"] } }, orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+  if (existing?.onboardingCompletedAt) redirect("/dashboard");
 
   async function completeOnboarding(formData: FormData) {
     "use server";
-
-    const businessName = formData.get("businessName")?.toString().trim() || "";
-    const businessType = formData.get("businessType")?.toString().trim() || "";
-    const descriptionRaw = formData.get("description")?.toString() || "";
-    const description = descriptionRaw.trim().slice(0, 500);
-    const focusTopic1 = formData.get("focusTopic1")?.toString().trim() || "";
-    const focusTopic2 = formData.get("focusTopic2")?.toString().trim() || "";
-    const focusTopic3 = formData.get("focusTopic3")?.toString().trim() || "";
-    const locationName = formData.get("locationName")?.toString().trim() || "";
-
-    if (!businessName || !locationName || !description) {
-      return;
-    }
-
     const { dbUser } = await requireDbUser();
+    const account = await ensureAccountForUser(dbUser);
+    const name = formData.get("businessName")?.toString().trim().slice(0, 120) || "";
+    const businessType = formData.get("businessType")?.toString().trim().slice(0, 80) || "";
+    const description = formData.get("description")?.toString().trim().slice(0, 1_000) || "";
+    const feedbackPointName = formData.get("locationName")?.toString().trim().slice(0, 120) || "";
+    const personaValue = formData.get("agentPersona")?.toString() || "AMANDA";
+    const persona: AgentPersona = ["AMANDA", "DEREK", "PROFESSIONAL", "DIRECT"].includes(personaValue) ? personaValue as AgentPersona : "AMANDA";
+    const goals = splitList(formData.get("goals"));
+    const recentChanges = formData.get("recentChanges")?.toString().trim().slice(0, 500) || "";
+    if (!name || description.length < 10 || !goals.length || !feedbackPointName) return;
 
-    const existing = await prisma.business.findFirst({
-      where: { ownerId: dbUser.id },
-      include: { locations: { orderBy: { createdAt: "asc" } } },
-    });
-
-    let businessId = existing?.id ?? null;
-    let businessSlug = existing?.slug ?? null;
-
-    if (!existing) {
-      const base = slugify(businessName);
-      const slug = await uniqueBusinessSlug(base);
-      const created = await prisma.business.create({
+    let space = await prisma.space.findFirst({ where: { accountId: account.id, onboardingCompletedAt: null } });
+    const firstThree = [...goals, null, null, null];
+    if (!space) {
+      space = await prisma.space.create({
         data: {
-          name: businessName,
-          slug,
+          name,
+          slug: await uniqueBusinessSlug(slugify(name)),
+          businessType: businessType || null,
+          description,
+          agentPersona: persona,
           ownerId: dbUser.id,
-          plan: "STARTER",
-          businessType: businessType || null,
-          description: description || null,
-          focusTopic1: focusTopic1 || null,
-          focusTopic2: focusTopic2 || null,
-          focusTopic3: focusTopic3 || null,
-          onboardingCompletedAt: new Date(),
+          accountId: account.id,
+          focusTopic1: firstThree[0],
+          focusTopic2: firstThree[1],
+          focusTopic3: firstThree[2],
         },
       });
-      businessId = created.id;
-      businessSlug = created.slug;
     } else {
-      await prisma.business.update({
-        where: { id: existing.id },
-        data: {
-          name: businessName,
-          businessType: businessType || null,
-          description: description || null,
-          focusTopic1: focusTopic1 || null,
-          focusTopic2: focusTopic2 || null,
-          focusTopic3: focusTopic3 || null,
-          onboardingCompletedAt: new Date(),
-        },
+      space = await prisma.space.update({
+        where: { id: space.id },
+        data: { name, businessType: businessType || null, description, agentPersona: persona, accountId: account.id, focusTopic1: firstThree[0], focusTopic2: firstThree[1], focusTopic3: firstThree[2] },
       });
     }
 
-    if (!businessId || !businessSlug) {
-      return;
-    }
-
-    const firstLocation = existing?.locations?.[0] ?? null;
-    if (!firstLocation) {
-      const locationSlug = await uniqueLocationSlug(`${businessSlug}-main`);
-      await prisma.location.create({
-        data: {
-          name: locationName,
-          slug: locationSlug,
-          businessId,
-        },
-      });
-    } else if (firstLocation.name !== locationName) {
-      await prisma.location.update({
-        where: { id: firstLocation.id },
-        data: { name: locationName },
-      });
-    }
-
+    const entityInputs: Array<[EntityType, string[]]> = [
+      ["PERSON", splitList(formData.get("people"))],
+      ["PRODUCT", splitList(formData.get("products"))],
+      ["SERVICE", splitList(formData.get("services"))],
+    ];
+    await prisma.$transaction(async (tx) => {
+      await tx.spaceGoal.deleteMany({ where: { spaceId: space.id, source: "ONBOARDING" } });
+      await tx.spaceGoal.createMany({ data: goals.map((label, priority) => ({ spaceId: space.id, label, priority })) });
+      for (const [type, names] of entityInputs) {
+        for (const entityName of names) {
+          await tx.trackedEntity.upsert({
+            where: { spaceId_type_name: { spaceId: space.id, type, name: entityName } },
+            create: { spaceId: space.id, type, name: entityName },
+            update: { active: true },
+          });
+        }
+      }
+      if (recentChanges && !/^nothing\b/i.test(recentChanges)) {
+        await tx.businessChange.create({ data: { spaceId: space.id, title: recentChanges, description: recentChanges } });
+      }
+      const point = await tx.feedbackPoint.findFirst({ where: { spaceId: space.id }, orderBy: { createdAt: "asc" } });
+      if (point) {
+        await tx.feedbackPoint.update({ where: { id: point.id }, data: { name: feedbackPointName, active: true } });
+      } else {
+        await tx.feedbackPoint.create({ data: { spaceId: space.id, name: feedbackPointName, slug: await uniqueLocationSlug(`${space.slug}-main`) } });
+      }
+      await tx.space.update({ where: { id: space.id }, data: { onboardingCompletedAt: new Date() } });
+      await tx.account.update({ where: { id: account.id }, data: { name } });
+    });
     redirect("/dashboard");
   }
 
+  const byType = (type: EntityType) => existing?.trackedEntities.filter((entity) => entity.type === type).map((entity) => entity.name).join(", ") || "";
   return (
     <div className="py-6">
-      <OnboardingWizard
-        action={completeOnboarding}
-        initialValues={{
-          businessName: initial.businessName,
-          businessType: initial.businessType,
-          description: initial.description,
-          focusTopic1: initial.focusTopic1,
-          focusTopic2: initial.focusTopic2,
-          focusTopic3: initial.focusTopic3,
-          locationName: initial.locationName,
-        }}
-      />
+      <OnboardingWizard action={completeOnboarding} initialValues={{
+        businessName: existing?.name,
+        businessType: existing?.businessType,
+        description: existing?.description,
+        goals: existing?.goals.map((goal) => goal.label).join(", "),
+        recentChanges: existing?.businessChanges[0]?.description,
+        people: byType("PERSON"),
+        products: byType("PRODUCT"),
+        services: byType("SERVICE"),
+        locationName: existing?.feedbackPoints[0]?.name,
+        agentPersona: existing?.agentPersona,
+      }} />
     </div>
   );
 }
-

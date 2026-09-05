@@ -1,11 +1,11 @@
 import { SignUp } from "@clerk/nextjs";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 
 export default async function SignUpPage() {
-  const user = await currentUser();
-  if (user) {
+  const { userId } = await auth();
+  if (userId) {
     redirect("/dashboard");
   }
 

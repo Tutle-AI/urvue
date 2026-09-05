@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { ReactNode, useState, useEffect, useRef } from "react";
 import { DashboardTopBar } from "./dashboard-topbar";
+import type { KiriPageContext } from "@/lib/kiri-context";
+
+const KiriChat = dynamic(
+  () => import("./kiri-chat").then((module) => module.KiriChat),
+  { ssr: false, loading: () => <div className="p-5 text-sm text-muted">Opening Kiri…</div> },
+);
 
 type Location = {
   id: string;
@@ -16,12 +23,14 @@ type DashboardShellProps = {
   children: ReactNode;
   businessName?: string;
   locations?: Location[];
+  kiriContext?: Pick<KiriPageContext, "accountId" | "spaceId">;
 };
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
-  { href: "/dashboard/sessions", label: "Sessions", icon: "chat" },
-  { href: "/dashboard/locations", label: "Locations", icon: "map" },
+  { href: "/dashboard/sessions", label: "Conversations", icon: "chat" },
+  { href: "/dashboard/locations", label: "Feedback Points", icon: "map" },
+  { href: "/dashboard/kiri", label: "Ask Kiri", icon: "chat" },
   { href: "/dashboard/settings", label: "Settings", icon: "cog" },
 ] as const;
 
@@ -80,7 +89,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
               viewBox="0 0 56 32"
               className="h-full w-full"
               role="img"
-              aria-label="Urvue logo"
+              aria-label="UrVue logo"
             >
               <circle cx="20" cy="16" r="14" fill="#F3E9D8" />
               <circle cx="36" cy="16" r="14" fill="#D3613A">
@@ -149,9 +158,11 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 export function DashboardShell({ 
   children, 
   businessName = "", 
-  locations = [] 
+  locations = [],
+  kiriContext,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [kiriOpen, setKiriOpen] = useState(false);
   const pathname = usePathname();
   const prevPathname = useRef(pathname);
 
@@ -199,7 +210,7 @@ export function DashboardShell({
               viewBox="0 0 56 32"
               className="h-full w-full"
               role="img"
-              aria-label="Urvue logo"
+              aria-label="UrVue logo"
             >
               <circle cx="20" cy="16" r="14" fill="#F3E9D8" />
               <circle cx="36" cy="16" r="14" fill="#D3613A">
@@ -281,6 +292,21 @@ export function DashboardShell({
           </main>
         </div>
       </div>
+      {kiriContext && (
+        <>
+          <button onClick={() => setKiriOpen(true)} className="fixed bottom-5 right-5 z-30 rounded-full bg-primary px-5 py-3 text-sm font-medium text-white shadow-xl transition hover:brightness-110" aria-label="Ask Kiri">
+            Ask Kiri
+          </button>
+          {kiriOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/45" onClick={() => setKiriOpen(false)}>
+              <aside className="h-full w-full max-w-md border-l border-border bg-card shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-border p-4"><div><p className="text-xs uppercase tracking-wide text-primary">Contextual intelligence</p><h2 className="text-lg font-semibold text-foreground">Kiri</h2></div><button onClick={() => setKiriOpen(false)} className="rounded-full border border-border px-3 py-1.5 text-sm text-muted">Close</button></div>
+                <KiriChat compact context={{ view: "overview", accountId: kiriContext.accountId, spaceId: kiriContext.spaceId }} />
+              </aside>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

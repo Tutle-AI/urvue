@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { requireOnboardedBusiness } from "@/lib/business";
-import { getSessionsWithFilters, getLocationStats } from "@/lib/stats";
+import { getLocationStats, getSessionsWithFilters } from "@/lib/stats";
 import { SessionFilters } from "./session-filters";
 
 function sentimentColor(sentiment: string | null | undefined) {
-  const s = (sentiment || "").toUpperCase();
-  if (s === "POSITIVE") return "bg-green-500/20 text-green-400";
-  if (s === "NEGATIVE") return "bg-red-500/20 text-red-400";
-  if (s === "NEUTRAL") return "bg-yellow-500/20 text-yellow-400";
+  const value = (sentiment || "").toUpperCase();
+  if (value === "POSITIVE") return "bg-green-500/20 text-green-400";
+  if (value === "NEGATIVE") return "bg-red-500/20 text-red-400";
+  if (value === "NEUTRAL") return "bg-yellow-500/20 text-yellow-400";
   return "bg-foreground/10 text-muted";
 }
 
@@ -54,17 +54,15 @@ export default async function SessionsPage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-          Sessions
+          Conversations
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {total} total session{total !== 1 ? "s" : ""}
+          {total} total conversation{total !== 1 ? "s" : ""}
         </p>
       </div>
 
-      {/* Filters */}
       <SessionFilters
         locations={locations}
         currentLocation={params.location}
@@ -72,15 +70,14 @@ export default async function SessionsPage({
         currentSearch={params.search}
       />
 
-      {/* Sessions list */}
       <div className="rounded-2xl border border-border bg-card">
         {sessions.length === 0 ? (
           <div className="p-8 text-center">
-            <div className="text-muted">No sessions found</div>
+            <div className="text-muted">No conversations found</div>
             <p className="mt-1 text-sm text-muted">
               {params.location || params.sentiment || params.search
                 ? "Try adjusting your filters"
-                : "Share your feedback link to start collecting sessions"}
+                : "Share a Feedback Point to start collecting conversations"}
             </p>
           </div>
         ) : (
@@ -98,29 +95,40 @@ export default async function SessionsPage({
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase ${statusColor(
-                        session.status
+                        session.status,
                       )}`}
                     >
                       {session.status}
                     </span>
                   </div>
                   <div className="mt-1 text-sm text-muted">
-                    {session.location.name} •{" "}
+                    {session.feedbackPoint.name} -{" "}
                     {formatDistanceToNow(session.createdAt, { addSuffix: true })}
                   </div>
-                  {session.summary && (
+                  {session.analysis?.findings.length ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {session.analysis.findings.map((finding) => (
+                        <span
+                          key={finding.id}
+                          className="rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary"
+                        >
+                          {finding.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : session.analysis || session.legacySummary ? (
                     <p className="mt-2 line-clamp-2 text-sm text-muted">
-                      {session.summary.summary}
+                      {session.analysis?.summary || session.legacySummary?.summary}
                     </p>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3">
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium uppercase ${sentimentColor(
-                      session.summary?.sentiment
+                      session.analysis?.sentiment || session.legacySummary?.sentiment,
                     )}`}
                   >
-                    {session.summary?.sentiment || "PENDING"}
+                    {session.analysis?.sentiment || session.legacySummary?.sentiment || session.analysisStatus}
                   </span>
                   <svg
                     className="h-5 w-5 shrink-0 text-muted"
@@ -141,7 +149,6 @@ export default async function SessionsPage({
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
             <div className="text-sm text-muted">
