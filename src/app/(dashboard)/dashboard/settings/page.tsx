@@ -1,38 +1,29 @@
-import { AgentPersona } from "@prisma/client";
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { BillingButtons } from "@/components/billing-buttons";
 import { requireOnboardedSpace } from "@/lib/business";
 import { prisma } from "@/lib/db";
-
-const personas: Array<[AgentPersona, string]> = [["AMANDA", "Amanda — warm and friendly"], ["DEREK", "Derek — upbeat and informal"], ["PROFESSIONAL", "Professional — polished and calm"], ["DIRECT", "Direct — concise and efficient"]];
 
 export default async function SettingsPage() {
   const { account, space } = await requireOnboardedSpace();
 
   async function save(formData: FormData) {
     "use server";
-    const { space } = await requireOnboardedSpace();
+    const { space, membership } = await requireOnboardedSpace();
+    if (membership.role === "MEMBER") return;
     const description = formData.get("description")?.toString().trim().slice(0, 1_000) || "";
-    const personaRaw = formData.get("agentPersona")?.toString() || "AMANDA";
-    const agentPersona = personas.some(([value]) => value === personaRaw) ? personaRaw as AgentPersona : "AMANDA";
-    const goals = (formData.get("goals")?.toString() || "").split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean).slice(0, 12);
-    await prisma.$transaction(async (tx) => {
-      await tx.space.update({ where: { id: space.id }, data: { description: description || null, agentPersona, focusTopic1: goals[0] || null, focusTopic2: goals[1] || null, focusTopic3: goals[2] || null } });
-      await tx.spaceGoal.deleteMany({ where: { spaceId: space.id } });
-      if (goals.length) await tx.spaceGoal.createMany({ data: goals.map((label, priority) => ({ spaceId: space.id, label, priority })) });
-    });
+    await prisma.space.update({ where: { id: space.id }, data: { description: description || null } });
     revalidatePath("/dashboard/settings");
   }
 
   return (
     <div className="space-y-7">
-      <div className="flex items-start justify-between gap-4"><div><p className="text-sm text-primary">Space settings</p><h1 className="mt-1 font-serif text-4xl text-foreground">{space.name}</h1><p className="mt-1 text-sm text-muted">Account plan: {account.plan}</p></div><BillingButtons plan={account.plan} /></div>
+      <div className="flex items-start justify-between gap-4"><div><p className="text-sm text-primary">Space settings</p><h1 className="mt-1 font-serif text-4xl text-foreground">{space.name}</h1><p className="mt-1 text-sm text-muted">Account plan: {account.plan === "STARTER" ? "Basic" : "Pro"}</p></div><BillingButtons plan={account.plan} /></div>
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <form action={save} className="space-y-5 rounded-3xl border border-border bg-card p-6">
-          <div><h2 className="text-xl font-semibold text-foreground">What UrVue knows</h2><p className="mt-1 text-sm text-muted">This context shapes customer interviews and Kiri’s analysis.</p></div>
+          <div><h2 className="text-xl font-semibold text-foreground">Your workspace context</h2><p className="mt-1 text-sm text-muted">Help Kiri understand your organization and the bigger picture.</p></div>
           <label className="block text-sm text-muted">Business context<textarea name="description" defaultValue={space.description || ""} className="mt-2 min-h-36 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground" /></label>
-          <label className="block text-sm text-muted">What you want to learn<textarea name="goals" defaultValue={space.goals.map((goal) => goal.label).join("\n")} className="mt-2 min-h-28 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground" /></label>
-          <label className="block text-sm text-muted">Customer-facing agent<select name="agentPersona" defaultValue={space.agentPersona} className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground">{personas.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5"><h3 className="text-sm font-medium text-foreground">Looking for your agents?</h3><p className="mt-2 text-sm leading-relaxed text-muted">Each feedback point now has its own context, conversation goals, and personality. Open a point to shape how its agent listens.</p><Link href="/dashboard/feedback-points" className="mt-4 inline-block text-sm font-medium text-primary">Manage Feedback Points →</Link></div>
           <button className="rounded-full bg-primary px-5 py-3 text-sm font-medium text-white">Save context</button>
         </form>
         <div className="space-y-5">

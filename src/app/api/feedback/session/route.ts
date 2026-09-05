@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createConversationCredential } from "@/lib/conversation-security";
 import { openingMessage } from "@/lib/interview";
+import { pointBrief } from "@/lib/feedback-point";
 import { checkRateLimit } from "@/lib/conversation-security";
 
 export async function POST(request: Request) {
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
       typeof body.customerName === "string" ? body.customerName.trim().slice(0, 80) || null : null;
 
     if (!slug) {
-      return NextResponse.json({ error: "Missing location slug" }, { status: 400 });
+      return NextResponse.json({ error: "Missing feedback point slug" }, { status: 400 });
     }
 
     const feedbackPoint = await prisma.feedbackPoint.findUnique({
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
     const credential = createConversationCredential();
     const greeting = openingMessage({
-      persona: feedbackPoint.space.agentPersona,
+      persona: feedbackPoint.agentPersona,
       customerName,
       spaceName: feedbackPoint.space.name,
       feedbackPointName: feedbackPoint.name,
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     const conversation = await prisma.conversation.create({
       data: {
         feedbackPointId: feedbackPoint.id,
+        interviewConfig: pointBrief(feedbackPoint),
         customerName,
         status: "ACTIVE",
         accessTokenHash: credential.hash,

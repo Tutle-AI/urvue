@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { openai, summaryModel } from "@/lib/openai";
 import { patternStrengthFor } from "@/lib/evidence-policy";
 import { featureEnabled } from "@/lib/features";
+import { conversationBrief, pointContext } from "@/lib/feedback-point";
 
 const ANALYSIS_VERSION = 2;
 
@@ -167,11 +168,7 @@ export async function analyzeConversation(conversationId: string) {
         feedbackPoint: {
           include: {
             space: {
-              include: {
-                goals: { where: { active: true }, orderBy: { priority: "asc" } },
-                trackedEntities: { where: { active: true } },
-                businessChanges: { where: { status: { in: ["PLANNED", "ACTIVE"] } } },
-              },
+              select: { id: true },
             },
           },
         },
@@ -193,6 +190,7 @@ export async function analyzeConversation(conversationId: string) {
     });
 
     const { space } = conversation.feedbackPoint;
+    const brief = conversationBrief(conversation.feedbackPoint, conversation.interviewConfig);
     const transcript = conversation.messages.map((message) => `${message.role}: ${message.content}`).join("\n");
     const response = await openai.responses.create({
       model: summaryModel,
@@ -211,13 +209,7 @@ export async function analyzeConversation(conversationId: string) {
         {
           role: "user",
           content: [
-            `Space: ${space.name}`,
-            space.businessType ? `Type: ${space.businessType}` : null,
-            space.description ? `Context: ${space.description}` : null,
-            space.goals.length ? `Goals: ${space.goals.map((goal) => goal.label).join("; ")}` : null,
-            space.trackedEntities.length ? `Tracked entities: ${space.trackedEntities.map((entity) => `${entity.type}:${entity.name}`).join("; ")}` : null,
-            space.businessChanges.length ? `Recent changes: ${space.businessChanges.map((change) => change.title).join("; ")}` : null,
-            `Feedback point: ${conversation.feedbackPoint.name}`,
+            pointContext(brief),
             "Transcript:",
             transcript,
           ].filter(Boolean).join("\n"),

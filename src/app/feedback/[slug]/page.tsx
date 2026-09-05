@@ -13,7 +13,6 @@ export default async function FeedbackPage({
   const { slug } = await params;
   const feedbackPoint = await prisma.feedbackPoint.findUnique({
     where: { slug },
-    include: { space: true },
   });
 
   if (!feedbackPoint || !feedbackPoint.active) {
@@ -22,12 +21,12 @@ export default async function FeedbackPage({
 
   return (
     <div className="min-h-screen bg-background px-4 py-6 text-foreground md:py-12">
-      <div className="mx-auto flex min-h-[calc(100svh-3rem)] max-w-5xl items-center justify-center">
+      <div className="mx-auto flex min-h-[calc(100svh-3rem)] max-w-5xl items-center justify-center md:min-h-[calc(100svh-6rem)]">
         <FeedbackChat
           slug={slug}
-          spaceName={feedbackPoint.space.name}
+          experienceType={feedbackPoint.businessType}
           feedbackPointName={feedbackPoint.name}
-          agentName={PERSONAS[feedbackPoint.space.agentPersona].name}
+          agentName={PERSONAS[feedbackPoint.agentPersona].name}
         />
       </div>
     </div>

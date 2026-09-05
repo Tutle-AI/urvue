@@ -1,14 +1,9 @@
 import { SignUp } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 
-export default async function SignUpPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect("/dashboard");
-  }
-
+export default function SignUpPage() {
+  // Keep Clerk mounted through session activation and OAuth callback subroutes;
+  // let it navigate once the authentication flow is complete.
   return (
     <AuthSplitLayout
       variant="sign-up"

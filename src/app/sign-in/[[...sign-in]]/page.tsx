@@ -1,14 +1,9 @@
 import { SignIn } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 
-export default async function SignInPage() {
-  const { userId } = await auth();
-  if (userId) {
-    redirect("/dashboard");
-  }
-
+export default function SignInPage() {
+  // Clerk owns navigation here, including callback subroutes. A server redirect
+  // during its session refresh can interrupt sign-in before activation finishes.
   return (
     <AuthSplitLayout
       variant="sign-in"

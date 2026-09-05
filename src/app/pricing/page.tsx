@@ -2,11 +2,11 @@ import Link from "next/link";
 
 const plans = [
   {
-    name: "Starter",
-    price: "$19",
+    name: "Basic",
+    price: "$24.99",
     description: "For one business getting started with customer conversations.",
     features: [
-      "1 feedback link",
+      "5 feedback points",
       "AI-led feedback conversations",
       "Structured summaries and themes",
       "Session history",
@@ -19,7 +19,7 @@ const plans = [
     price: "$49",
     description: "For teams collecting feedback across more locations, services, or moments.",
     features: [
-      "5 feedback links",
+      "5 feedback points",
       "Actionable insight dashboard",
       "Theme, pain point, and quote tracking",
       "Priority support",
@@ -87,7 +87,7 @@ export default function PricingPage() {
         </div>
 
         <div className="mt-8 rounded-2xl border border-border bg-card p-5 text-sm text-muted">
-          Need more feedback links, higher volume, or custom reporting? UrVue can grow
+          Need more feedback points, higher volume, or custom reporting? UrVue can grow
           into an Enterprise plan without changing the core experience.
         </div>
       </div>

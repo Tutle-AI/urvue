@@ -29,7 +29,7 @@ type DashboardShellProps = {
 const nav = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
   { href: "/dashboard/sessions", label: "Conversations", icon: "chat" },
-  { href: "/dashboard/locations", label: "Feedback Points", icon: "map" },
+  { href: "/dashboard/feedback-points", label: "Feedback Points", icon: "map" },
   { href: "/dashboard/kiri", label: "Ask Kiri", icon: "chat" },
   { href: "/dashboard/settings", label: "Settings", icon: "cog" },
 ] as const;

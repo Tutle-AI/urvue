@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       where: { id: context.spaceId, accountId: account.id },
       include: {
         goals: { where: { active: true }, orderBy: { priority: "asc" } },
+        feedbackPoints: { select: { id: true, name: true, businessType: true, description: true, goals: true, agentPersona: true } },
         businessChanges: { where: { status: { in: ["PLANNED", "ACTIVE"] } } },
       },
     });
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
     const sentimentCount = (sentiment: "POSITIVE" | "NEUTRAL" | "NEGATIVE") => sentimentRows.find((row) => row.sentiment === sentiment)?._count._all || 0;
     const compactData = {
       space: { name: space.name, description: space.description, goals: space.goals.map((goal) => goal.label), changes: space.businessChanges.map((change) => change.title) },
+      feedbackPoints: space.feedbackPoints,
       page: context,
       sample: {
         totalConversations: conversationCount,
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
           content: [
             "You are Kiri, UrVue's careful customer-intelligence analyst for a normal business owner.",
             "Answer only from the compact structured dataset supplied; never invent a fact or imply you read data that is absent.",
+            "Each feedback point has an independent agent brief. Goals describe what the owner wants to learn, not observed customer findings. Workspace totals must never be attributed to an individual point.",
             "Every quantitative or evaluative answer must state the analyzed sample size and confidence/pattern strength.",
             "Treat one conversation as isolated, two to four as emerging, and five or more as potentially established.",
             "Do not rank staff unless at least eight distinct conversations support the ranking.",

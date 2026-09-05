@@ -1,8 +1,9 @@
 import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { chatModel, openai } from "@/lib/openai";
+import { feedbackModel, openai } from "@/lib/openai";
 import { checkRateLimit, credentialMatches, readBearerToken } from "@/lib/conversation-security";
-import { interviewSystemPrompt } from "@/lib/interview";
+import { finalReply, interviewSystemPrompt } from "@/lib/interview";
+import { conversationBrief, pointContext } from "@/lib/feedback-point";
 import { closeConversationAndEnqueueAnalysis, processIntelligenceJob } from "@/lib/intelligence";
 import { featureEnabled } from "@/lib/features";
 
@@ -36,15 +37,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       feedbackPoint: {
         include: {
           space: {
-            include: {
-              goals: { where: { active: true }, orderBy: { priority: "asc" } },
-              trackedEntities: { where: { active: true } },
-              businessChanges: { where: { status: { in: ["PLANNED", "ACTIVE"] } } },
-            },
+            select: { id: true },
           },
         },
       },
-      messages: { orderBy: { createdAt: "desc" }, take: 24 },
+      messages: { orderBy: { createdAt: "desc" }, take: 41 },
       _count: { select: { messages: { where: { role: "CUSTOMER" } } } },
     },
   });
@@ -55,26 +52,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (conversation._count.messages >= 20) return NextResponse.json({ error: "This conversation has reached its message limit." }, { status: 409 });
 
   const { space } = conversation.feedbackPoint;
+  const brief = conversationBrief(conversation.feedbackPoint, conversation.interviewConfig);
   const customerMessage = await prisma.conversationMessage.create({
     data: { conversationId: id, role: "CUSTOMER", content: message },
   });
   const response = await openai.responses.create({
-    model: chatModel,
-    max_output_tokens: 180,
+    model: feedbackModel,
+    ...(feedbackModel.startsWith("gpt-5.6") ? { reasoning: { effort: "none" as const } } : {}),
+    max_output_tokens: 500,
     store: false,
     input: [
-      { role: "system", content: interviewSystemPrompt(space.agentPersona) },
+      { role: "system", content: interviewSystemPrompt(brief.agentPersona) },
       {
         role: "system",
         content: [
-          `Space: ${space.name}`,
-          space.businessType ? `Type: ${space.businessType}` : null,
-          space.description ? `Context: ${space.description}` : null,
-          space.goals.length ? `Goals: ${space.goals.map((goal) => goal.label).join("; ")}` : null,
-          space.trackedEntities.length ? `Listen for: ${space.trackedEntities.map((entity) => entity.name).join("; ")}` : null,
-          space.businessChanges.length ? `Recent changes: ${space.businessChanges.map((change) => change.title).join("; ")}` : null,
-          `Feedback point: ${conversation.feedbackPoint.name}`,
-          "Set finalize=true when at least one concrete detail and its reason are clear, or the customer wants to stop.",
+          pointContext(brief),
+          conversation._count.messages >= 19 ? "This is the last turn. Set finalize=true and acknowledge their feedback without asking another question." : "Continue naturally using the full conversation above to avoid repeating answered goals.",
         ].filter(Boolean).join("\n"),
       },
       ...[...conversation.messages].reverse().map((item) => ({
@@ -86,12 +79,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     text: { format: replyFormat },
   });
   const payload = JSON.parse(response.output_text || "{}") as { reply?: string; finalize?: boolean };
-  const reply = payload.reply?.trim().slice(0, 1_000) || "Thanks for sharing that. What would you most like the team to change?";
+  const finalize = payload.finalize === true || conversation._count.messages >= 19;
+  const reply = finalize ? finalReply(payload.reply) : payload.reply?.trim().slice(0, 1_000) || "Thanks for sharing that. What would you most like the team to change?";
   await prisma.conversationMessage.create({ data: { conversationId: id, role: "ASSISTANT", content: reply } });
 
-  if (payload.finalize) {
+  if (finalize) {
     const job = await closeConversationAndEnqueueAnalysis(id, space.id, new Date());
     after(() => processIntelligenceJob(job.id));
   }
-  return NextResponse.json({ reply, finalize: Boolean(payload.finalize), analysisStatus: payload.finalize ? "PENDING" : null });
+  return NextResponse.json({ reply, finalize, analysisStatus: finalize ? "PENDING" : null });
 }

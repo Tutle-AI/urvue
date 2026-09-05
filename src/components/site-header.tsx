@@ -5,11 +5,11 @@ export async function SiteHeader() {
   const { userId } = await auth();
 
   return (
-    <header className="flex items-center justify-between py-6 md:py-8">
+    <header className="flex items-center justify-between gap-2 py-6 md:py-8">
       {/* Logo */}
       <Link
         href="/"
-        className="flex items-center gap-3 font-serif text-xl font-normal tracking-tight md:text-2xl"
+        className="flex shrink-0 items-center gap-2 font-serif text-xl font-normal tracking-tight md:gap-3 md:text-2xl"
         id="urvueLogoLink"
       >
         <span className="inline-flex h-[38px] w-[38px] items-center justify-center md:h-[44px] md:w-[44px]">
@@ -48,7 +48,7 @@ export async function SiteHeader() {
       </Link>
 
       {/* Center Navigation */}
-      <nav className="hidden items-center gap-10 text-base text-muted md:flex">
+      <nav className="hidden items-center gap-5 text-base text-muted md:flex lg:gap-10">
         <Link href="/#features" className="transition hover:text-foreground">
           Features
         </Link>
@@ -64,12 +64,22 @@ export async function SiteHeader() {
       </nav>
 
       {/* Right CTA */}
-      <Link
-        href={userId ? "/dashboard" : "/sign-up"}
-        className="rounded-full border border-foreground/30 px-6 py-2.5 text-sm font-medium text-foreground transition hover:border-foreground hover:bg-foreground/5 md:text-base"
-      >
-        {userId ? "Dashboard" : "Get started"}
-      </Link>
+      <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+        {!userId && (
+          <Link
+            href="/sign-in"
+            className="py-2.5 text-sm font-medium text-muted transition hover:text-foreground md:text-base"
+          >
+            Sign-in
+          </Link>
+        )}
+        <Link
+          href={userId ? "/dashboard" : "/sign-up"}
+          className="rounded-full border border-foreground/30 px-3 py-2.5 text-sm font-medium text-foreground transition hover:border-foreground hover:bg-foreground/5 sm:px-6 md:text-base"
+        >
+          {userId ? "Dashboard" : "Get started"}
+        </Link>
+      </div>
     </header>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import type { KiriPageContext } from "@/lib/kiri-context";
+import { handleChatKeyDown } from "@/lib/chat-keyboard";
 
 type Citation = { conversationId: string; label: string; href: string };
 type ChatMessage = { role: "user" | "assistant"; content: string; citations?: Citation[] };
@@ -68,7 +69,8 @@ export function KiriChat({
         {loading && <div className="w-fit rounded-2xl bg-surface px-4 py-3 text-sm text-muted">Kiri is checking the evidence…</div>}
       </div>
       <form onSubmit={submit} className="border-t border-border p-4">
-        <textarea value={input} onChange={(event) => setInput(event.target.value.slice(0, 2_000))} placeholder="Ask Kiri about your customer feedback…" className="min-h-20 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50" />
+        <textarea aria-label="Ask Kiri" value={input} onChange={(event) => setInput(event.target.value.slice(0, 2_000))} onKeyDown={(event) => handleChatKeyDown(event, () => event.currentTarget.form?.requestSubmit(), setInput)} placeholder="Ask Kiri about your customer feedback…" className="min-h-20 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50" />
+        <p className="mt-1 text-xs text-muted">Enter to send · Ctrl+Enter for a new line</p>
         <div className="mt-2 flex items-center justify-between gap-3">
           <span className="text-xs text-muted">Answers use structured feedback, not guesses.</span>
           <button disabled={!input.trim() || loading} className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">Ask Kiri</button>

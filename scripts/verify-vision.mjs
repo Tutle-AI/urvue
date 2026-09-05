@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const requireHistoricalBaseline = process.argv.includes("--baseline");
@@ -25,6 +25,7 @@ async function main() {
     unfinishedJobs,
     failedJobs,
     skippedConversations,
+    conversationsMissingBrief,
   ] = await Promise.all([
     prisma.account.count(),
     prisma.accountMembership.count(),
@@ -42,6 +43,7 @@ async function main() {
     prisma.intelligenceJob.count({ where: { status: { in: ["PENDING", "PROCESSING"] } } }),
     prisma.intelligenceJob.count({ where: { status: "FAILED" } }),
     prisma.conversation.count({ where: { analysisStatus: "SKIPPED" } }),
+    prisma.conversation.count({ where: { interviewConfig: { equals: Prisma.AnyNull } } }),
   ]);
 
   assert(unassignedSpaces === 0, `${unassignedSpaces} Space(s) are missing an Account`);
@@ -49,6 +51,7 @@ async function main() {
   assert(activeInsightsWithoutEvidence === 0, `${activeInsightsWithoutEvidence} active Insight(s) have no evidence`);
   assert(unfinishedJobs === 0, `${unfinishedJobs} intelligence job(s) are unfinished`);
   assert(failedJobs === 0, `${failedJobs} intelligence job(s) have failed`);
+  assert(conversationsMissingBrief === 0, `${conversationsMissingBrief} conversation(s) are missing their agent brief`);
 
   if (requireHistoricalBaseline) {
     assert(accounts === 2, `Expected 2 Accounts, found ${accounts}`);
@@ -74,6 +77,7 @@ async function main() {
     findings,
     activeInsights,
     skippedConversations,
+    conversationsMissingBrief,
     unfinishedJobs,
     failedJobs,
   }, null, 2));

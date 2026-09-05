@@ -247,6 +247,10 @@ model FeedbackPoint {
   spaceId       String         @map("businessId")
   name          String
   slug          String         @unique
+  businessType  String         @default("Other")
+  description   String         @default("")
+  goals         String[]       @default([])
+  agentPersona  AgentPersona   @default(AMANDA)
   conversations Conversation[]
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
@@ -263,6 +267,7 @@ model Conversation {
   status          SessionStatus         @default(ACTIVE)
   analysisStatus  AnalysisStatus        @default(PENDING)
   accessTokenHash String?
+  interviewConfig Json?
   messages        ConversationMessage[]
   legacySummary   FeedbackSummary?
   legacyInsight   FeedbackInsight?

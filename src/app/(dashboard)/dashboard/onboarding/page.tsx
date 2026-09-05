@@ -7,6 +7,7 @@ import { slugify } from "@/lib/slug";
 import { uniqueBusinessSlug, uniqueLocationSlug } from "@/lib/unique-slug";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { featureEnabled } from "@/lib/features";
+import { pointLimit } from "@/lib/feedback-point";
 
 function splitList(value: FormDataEntryValue | null) {
   return (value?.toString() || "").split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean).slice(0, 12);
@@ -31,6 +32,8 @@ export default async function OnboardingPage() {
     "use server";
     const { dbUser } = await requireDbUser();
     const account = await ensureAccountForUser(dbUser);
+    const completed = await prisma.space.findFirst({ where: { accountId: account.id, onboardingCompletedAt: { not: null } } });
+    if (completed) redirect("/dashboard/feedback-points");
     const name = formData.get("businessName")?.toString().trim().slice(0, 120) || "";
     const businessType = formData.get("businessType")?.toString().trim().slice(0, 80) || "";
     const description = formData.get("description")?.toString().trim().slice(0, 1_000) || "";
@@ -41,36 +44,39 @@ export default async function OnboardingPage() {
     const recentChanges = formData.get("recentChanges")?.toString().trim().slice(0, 500) || "";
     if (!name || description.length < 10 || !goals.length || !feedbackPointName) return;
 
-    let space = await prisma.space.findFirst({ where: { accountId: account.id, onboardingCompletedAt: null } });
-    const firstThree = [...goals, null, null, null];
-    if (!space) {
-      space = await prisma.space.create({
-        data: {
-          name,
-          slug: await uniqueBusinessSlug(slugify(name)),
-          businessType: businessType || null,
-          description,
-          agentPersona: persona,
-          ownerId: dbUser.id,
-          accountId: account.id,
-          focusTopic1: firstThree[0],
-          focusTopic2: firstThree[1],
-          focusTopic3: firstThree[2],
-        },
-      });
-    } else {
-      space = await prisma.space.update({
-        where: { id: space.id },
-        data: { name, businessType: businessType || null, description, agentPersona: persona, accountId: account.id, focusTopic1: firstThree[0], focusTopic2: firstThree[1], focusTopic3: firstThree[2] },
-      });
-    }
-
-    const entityInputs: Array<[EntityType, string[]]> = [
-      ["PERSON", splitList(formData.get("people"))],
-      ["PRODUCT", splitList(formData.get("products"))],
-      ["SERVICE", splitList(formData.get("services"))],
-    ];
     await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Account" WHERE "id" = ${account.id} FOR UPDATE`;
+      const completed = await tx.space.findFirst({ where: { accountId: account.id, onboardingCompletedAt: { not: null } } });
+      if (completed) return;
+      let space = await tx.space.findFirst({ where: { accountId: account.id, onboardingCompletedAt: null } });
+      const firstThree = [...goals, null, null, null];
+      if (!space) {
+        space = await tx.space.create({
+          data: {
+            name,
+            slug: await uniqueBusinessSlug(slugify(name)),
+            businessType: businessType || null,
+            description,
+            agentPersona: persona,
+            ownerId: dbUser.id,
+            accountId: account.id,
+            focusTopic1: firstThree[0],
+            focusTopic2: firstThree[1],
+            focusTopic3: firstThree[2],
+          },
+        });
+      } else {
+        space = await tx.space.update({
+          where: { id: space.id },
+          data: { name, businessType: businessType || null, description, agentPersona: persona, accountId: account.id, focusTopic1: firstThree[0], focusTopic2: firstThree[1], focusTopic3: firstThree[2] },
+        });
+      }
+
+      const entityInputs: Array<[EntityType, string[]]> = [
+        ["PERSON", splitList(formData.get("people"))],
+        ["PRODUCT", splitList(formData.get("products"))],
+        ["SERVICE", splitList(formData.get("services"))],
+      ];
       await tx.spaceGoal.deleteMany({ where: { spaceId: space.id, source: "ONBOARDING" } });
       await tx.spaceGoal.createMany({ data: goals.map((label, priority) => ({ spaceId: space.id, label, priority })) });
       for (const [type, names] of entityInputs) {
@@ -87,14 +93,16 @@ export default async function OnboardingPage() {
       }
       const point = await tx.feedbackPoint.findFirst({ where: { spaceId: space.id }, orderBy: { createdAt: "asc" } });
       if (point) {
-        await tx.feedbackPoint.update({ where: { id: point.id }, data: { name: feedbackPointName, active: true } });
+        await tx.feedbackPoint.update({ where: { id: point.id }, data: { name: feedbackPointName, active: true, businessType: businessType || "Other", description, goals, agentPersona: persona } });
       } else {
-        await tx.feedbackPoint.create({ data: { spaceId: space.id, name: feedbackPointName, slug: await uniqueLocationSlug(`${space.slug}-main`) } });
+        const count = await tx.feedbackPoint.count({ where: { space: { accountId: account.id } } });
+        if (count >= pointLimit(account.plan)) throw new Error("Feedback point allowance reached");
+        await tx.feedbackPoint.create({ data: { spaceId: space.id, name: feedbackPointName, slug: await uniqueLocationSlug(`${space.slug}-main`), businessType: businessType || "Other", description, goals, agentPersona: persona } });
       }
       await tx.space.update({ where: { id: space.id }, data: { onboardingCompletedAt: new Date() } });
       await tx.account.update({ where: { id: account.id }, data: { name } });
     });
-    redirect("/dashboard");
+    redirect("/dashboard/feedback-points");
   }
 
   const byType = (type: EntityType) => existing?.trackedEntities.filter((entity) => entity.type === type).map((entity) => entity.name).join(", ") || "";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { checkRateLimit, createConversationCredential } from "@/lib/conversation-security";
 import { openingMessage } from "@/lib/interview";
+import { pointBrief } from "@/lib/feedback-point";
 import { featureEnabled } from "@/lib/features";
 
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
 
   const credential = createConversationCredential();
   const greeting = openingMessage({
-    persona: point.space.agentPersona,
+    persona: point.agentPersona,
     customerName,
     spaceName: point.space.name,
     feedbackPointName: point.name,
@@ -28,6 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   const conversation = await prisma.conversation.create({
     data: {
       feedbackPointId: point.id,
+      interviewConfig: pointBrief(point),
       customerName: customerName || null,
       accessTokenHash: credential.hash,
       messages: { create: { role: "ASSISTANT", content: greeting } },

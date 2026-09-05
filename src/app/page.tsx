@@ -60,7 +60,7 @@ function DashboardPreview() {
         <aside className="hidden border-r border-border bg-surface p-5 md:block">
           <div className="font-serif text-xl text-foreground">UrVue</div>
           <div className="mt-8 space-y-2 text-sm">
-            {["Overview", "Sessions", "Feedback links", "Settings"].map((item, index) => (
+            {["Overview", "Sessions", "Feedback Points", "Settings"].map((item, index) => (
               <div
                 key={item}
                 className={`rounded-xl px-3 py-2 ${
@@ -164,24 +164,21 @@ export default async function Home() {
   return (
     <main className="bg-background text-foreground">
       <section className="bg-background">
-        <div className="mx-auto flex min-h-[100svh] max-w-7xl flex-col px-6">
+        <div className="mx-auto max-w-7xl px-6">
           <SiteHeader />
 
-          <div className="grid flex-1 gap-10 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-20">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-primary">
-                AI customer feedback for real businesses
-              </div>
-              <h1 className="mt-5 font-serif text-6xl font-normal leading-[0.95] tracking-tight md:text-7xl">
-                clear feedback from real conversations
+          <div className="flex min-h-[calc(100svh-23rem)] flex-col items-center justify-center pb-16 pt-12 text-center md:pb-20 md:pt-16">
+            <div className="w-full">
+              <h1 className="mx-auto max-w-6xl text-balance font-serif text-[clamp(2.75rem,14vw,3.5rem)] font-normal leading-[0.98] tracking-tight sm:text-[clamp(3.5rem,8.5vw,7.5rem)]">
+                clear feedback<br className="hidden sm:block" /> from real conversations
               </h1>
-              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
+              <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-muted">
                 UrVue gives your customers one simple feedback link, then turns
                 their conversation into themes, quotes, pain points, praise, and
                 suggested actions for your team.
               </p>
 
-              <div className="mt-9 flex flex-wrap gap-4">
+              <div className="mt-9 flex flex-wrap justify-center gap-4">
                 <Link
                   href="/sign-up"
                   className="rounded-full bg-foreground px-7 py-3 text-sm font-medium text-background transition hover:bg-foreground/90"
@@ -196,13 +193,17 @@ export default async function Home() {
                 </Link>
               </div>
 
-              <div className="mt-8 grid max-w-xl gap-3 text-sm text-muted sm:grid-cols-3">
+              <div className="mx-auto mt-8 flex max-w-xl flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-muted">
                 <div>Setup in minutes</div>
                 <div>No survey builder</div>
                 <div>Built on OpenAI</div>
               </div>
             </div>
-
+          </div>
+        </div>
+        <div className="relative px-6">
+          <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/2 bg-light" />
+          <div className="relative mx-auto max-w-6xl">
             <DashboardPreview />
           </div>
         </div>

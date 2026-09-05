@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 
 type Location = {
@@ -22,11 +23,13 @@ export function DashboardTopBar({
   currentLocationId,
 }: DashboardTopBarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentLocation = currentLocationId
     ? locations.find((l) => l.id === currentLocationId)
-    : locations[0];
+    : locations.find((point) => pathname === `/dashboard/feedback-points/${point.id}`);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -105,7 +108,7 @@ export function DashboardTopBar({
                 />
               </svg>
               <span className="max-w-[180px] truncate">
-                {currentLocation?.name || "Select feedback link"}
+                {currentLocation?.name || "Feedback Points"}
               </span>
               <svg
                 className={`h-4 w-4 text-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -125,7 +128,7 @@ export function DashboardTopBar({
                 <div className="max-h-64 overflow-y-auto p-1.5">
                   {locations.length === 0 ? (
                     <div className="px-3 py-4 text-center text-sm text-muted">
-                      No feedback links yet
+                      No feedback points yet
                     </div>
                   ) : (
                     locations.map((location) => (
@@ -133,7 +136,7 @@ export function DashboardTopBar({
                         key={location.id}
                         onClick={() => {
                           setIsOpen(false);
-                          // Feedback-link scoped dashboard filters can be added here later.
+                          router.push(`/dashboard/feedback-points/${location.id}`);
                         }}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
                           location.id === currentLocation?.id
@@ -194,7 +197,7 @@ export function DashboardTopBar({
                 {/* Create new location */}
                 <div className="p-1.5">
                   <Link
-                    href="/dashboard/locations"
+                    href="/dashboard/feedback-points"
                     onClick={() => setIsOpen(false)}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-muted transition hover:bg-surface hover:text-foreground"
                   >
@@ -213,7 +216,7 @@ export function DashboardTopBar({
                         />
                       </svg>
                     </span>
-                    <span>Add feedback link</span>
+                    <span>Manage Feedback Points</span>
                   </Link>
                 </div>
               </div>

@@ -17,7 +17,7 @@ type Values = {
   agentPersona?: AgentPersona | null;
 };
 
-const BUSINESS_TYPES = ["Website", "App/SaaS", "Restaurant/Cafe", "Retail", "Barber/Salon", "Gym", "Hospitality", "Service business", "Other"];
+const BUSINESS_TYPES = ["Website", "App/SaaS", "Video game", "Restaurant/Cafe", "Retail", "Barber/Salon", "Gym", "Hospitality", "Service business", "Other"];
 const PERSONAS: Array<{ value: AgentPersona; name: string; detail: string }> = [
   { value: "AMANDA", name: "Amanda", detail: "Friendly, warm, and casual" },
   { value: "DEREK", name: "Derek", detail: "Informal, upbeat, and energetic" },
@@ -29,7 +29,7 @@ export function OnboardingWizard({ action, initialValues }: { action: Action; in
   const [step, setStep] = useState(0);
   const [values, setValues] = useState({
     businessName: initialValues.businessName || "",
-    businessType: initialValues.businessType || "Restaurant/Cafe",
+    businessType: initialValues.businessType || "Website",
     description: initialValues.description || "",
     goals: initialValues.goals || "",
     recentChanges: initialValues.recentChanges || "",
@@ -41,12 +41,12 @@ export function OnboardingWizard({ action, initialValues }: { action: Action; in
   });
   const update = (field: keyof typeof values, value: string) => setValues((current) => ({ ...current, [field]: value }));
   const steps = [
-    { question: "Let’s start simply. What should we call your business or Space?", answer: values.businessName },
-    { question: "Tell me about the business, your customers, and what a good experience should feel like.", answer: values.description },
+    { question: "Let’s start simply. What should we call your workspace, and what kind of experience will your first feedback point cover?", answer: values.businessName },
+    { question: "Tell me about that first experience, who it’s for, and what a good experience should feel like.", answer: values.description },
     { question: "What are the most important things you want to learn from customers?", answer: values.goals },
     { question: "Has anything changed recently that I should watch? It’s fine to say nothing.", answer: values.recentChanges || "Nothing recent" },
     { question: "Who or what should UrVue recognize by name?", answer: [values.people, values.products, values.services].filter(Boolean).join(" · ") || "Nothing yet" },
-    { question: "Finally, choose who should talk with your customers.", answer: PERSONAS.find((persona) => persona.value === values.agentPersona)?.name || "Amanda" },
+    { question: "Finally, choose who should listen at your first feedback point. You can choose a different personality for every point.", answer: PERSONAS.find((persona) => persona.value === values.agentPersona)?.name || "Amanda" },
   ];
   const canContinue = useMemo(() => {
     if (step === 0) return values.businessName.trim().length > 1;
@@ -61,7 +61,7 @@ export function OnboardingWizard({ action, initialValues }: { action: Action; in
       <div className="rounded-3xl border border-border bg-card p-5 shadow-xl sm:p-8">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">A conversation with UrVue</p>
         <h1 className="mt-2 font-serif text-3xl text-foreground">Teach UrVue what matters</h1>
-        <p className="mt-2 text-sm text-muted">No survey builder. Just tell us about the experience you want to understand.</p>
+        <p className="mt-2 text-sm text-muted">Let’s give your first feedback point its own agent, context, and conversation goals.</p>
 
         <div className="mt-7 max-h-[52svh] space-y-4 overflow-y-auto rounded-2xl bg-surface/60 p-4 sm:p-5">
           {steps.slice(0, step + 1).map((item, index) => (

@@ -75,7 +75,7 @@ function InteractiveSplitSection({
                   role="tab"
                   aria-selected={selected}
                   onClick={() => setActive(index)}
-                  className={`w-full rounded-xl px-5 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
+                  className={`w-full cursor-pointer rounded-xl px-5 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 ${
                     selected
                       ? isLight
                         ? "border border-background/20 bg-background/5"

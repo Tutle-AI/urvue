@@ -101,7 +101,7 @@ export function SessionFilters({
           onChange={(e) => updateParams("location", e.target.value)}
           className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none ring-2 ring-transparent transition focus:ring-primary/50"
         >
-          <option value="">All feedback links</option>
+          <option value="">All feedback points</option>
           {locations.map((loc) => (
             <option key={loc.id} value={loc.id}>
               {loc.name}
@@ -129,7 +129,7 @@ export function SessionFilters({
           <span className="text-xs text-muted">Active filters:</span>
           {currentLocation && (
             <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-medium text-primary">
-              {locations.find((l) => l.id === currentLocation)?.name || "Feedback link"}
+              {locations.find((l) => l.id === currentLocation)?.name || "Feedback point"}
             </span>
           )}
           {currentSentiment && (

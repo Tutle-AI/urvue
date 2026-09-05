@@ -6,5 +6,6 @@ export const openai = new OpenAI({
 });
 
 export const chatModel = env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
+export const feedbackModel = env.OPENAI_FEEDBACK_MODEL;
 export const summaryModel = env.OPENAI_SUMMARY_MODEL || "gpt-4o-mini";
 

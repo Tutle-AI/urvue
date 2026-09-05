@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/dashboard/kiri" className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:border-primary">Ask Kiri</Link>
-          <Link href="/dashboard/locations" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white">Share feedback</Link>
+          <Link href="/dashboard/feedback-points" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white">Share feedback</Link>
         </div>
       </div>
 
